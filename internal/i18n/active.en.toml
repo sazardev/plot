@@ -1,0 +1,222 @@
+["cli.help.short"]
+description = "Short command description."
+other = "terminal data plotter"
+
+["cli.help.preamble"]
+description = "One-line and multi-line help introduction."
+other = """pl - terminal data plotter
+
+Reads delimited data from stdin or a file, infers columns and renders a chart."""
+
+["cli.help.usage_label"]
+description = "Label before the usage line."
+other = "Usage"
+
+["cli.help.input_label"]
+description = "Label before the input description."
+other = "Input"
+
+["cli.help.input"]
+description = "Input modes supported by the CLI."
+other = """  stdin is read when it is not a TTY and no file is given.
+  Use '-' to read stdin explicitly; pass a file path to read a file."""
+
+["cli.help.types_label"]
+description = "Label before supported chart types."
+other = "Chart types"
+
+["cli.help.types"]
+description = "Supported chart types and the default rule."
+other = """  line, bar, plot (alias), graph (alias)
+  Default: bar for one categorical series with at most 30 rows, otherwise line.
+  pie and donut are accepted values but are not implemented yet."""
+
+["cli.help.flags_label"]
+description = "Label before the flag table."
+other = "Flags"
+
+["cli.help.examples_label"]
+description = "Label before examples."
+other = "Examples"
+
+["cli.help.examples"]
+description = "Example invocations."
+other = """  printf 'day,signups\\nMon,3\\nTue,5\\n' | pl
+  pl sales.csv
+  pl sales.csv --type bar --title 'Revenue'"""
+
+["cli.help.exit_label"]
+description = "Label before the exit-code summary."
+other = "Exit codes"
+
+["cli.help.exit_codes"]
+description = "Exit-code summary shown by --help."
+other = "  0 success; 1 data/environment error; 2 usage error; 3 source error; 130 interrupted; 141 broken pipe"
+
+["cli.flag.type"]
+description = "Flag description for --type."
+other = "chart type: line, bar, plot or graph"
+
+["cli.flag.delimiter"]
+description = "Flag description for --delimiter."
+other = "delimiter: auto, comma, tab, semicolon, pipe, or one rune"
+
+["cli.flag.header"]
+description = "Flag description for --header."
+other = "force the first record to be a header"
+
+["cli.flag.no_header"]
+description = "Flag description for --no-header."
+other = "force the first record to be data"
+
+["cli.flag.width"]
+description = "Flag description for --width."
+other = "chart width in cells (20-500 for the CLI)"
+
+["cli.flag.height"]
+description = "Flag description for --height."
+other = "chart height in cells (8-200 for the CLI)"
+
+["cli.flag.color"]
+description = "Flag description for --color."
+other = "color mode: auto, always or never"
+
+["cli.flag.ascii"]
+description = "Flag description for --ascii."
+other = "use ASCII glyphs instead of Unicode"
+
+["cli.flag.title"]
+description = "Flag description for --title."
+other = "chart title"
+
+["cli.flag.help"]
+description = "Flag description for --help."
+other = "show this help"
+
+["cli.flag.version"]
+description = "Flag description for --version."
+other = "print the version"
+
+["cli.error.no_input"]
+description = "No stdin, file or database source was provided."
+other = "no input; pipe data or pass a file"
+
+["cli.error.no_data"]
+description = "An input source produced no data."
+other = "no data"
+
+["cli.error.no_data_stdin"]
+description = "stdin was empty."
+other = "no data on stdin"
+
+["cli.error.no_data_file"]
+description = "A file was empty."
+other = "no data in {{.Path}}"
+
+["cli.error.no_rows"]
+description = "The input had a header but no data rows."
+other = "no data rows"
+
+["cli.error.no_numeric_column"]
+description = "No column could be used as a numeric series."
+other = "no numeric columns; available: {{.Columns}}"
+
+["cli.error.no_numeric_column_none"]
+description = "No numeric columns and no names to list."
+other = "no numeric columns"
+
+["cli.error.input_too_large"]
+description = "The input exceeded the configured size limit."
+other = "input is larger than {{.Limit}} bytes"
+
+["cli.error.source"]
+description = "A file could not be opened or read."
+other = "cannot read {{.Path}}: {{.Detail}}"
+
+["cli.error.parse"]
+description = "The input could not be parsed."
+other = "cannot parse input: {{.Detail}}"
+
+["cli.error.usage"]
+description = "A generic usage error detail."
+other = "{{.Detail}}"
+
+["cli.error.usage_hint"]
+description = "Hint printed after a usage error."
+other = "run 'pl --help' for usage"
+
+["cli.error.unsupported_chart"]
+description = "A valid chart type is not implemented yet."
+other = "chart type {{.Type}} is not implemented yet; use line or bar"
+
+["cli.error.incompatible_chart"]
+description = "A chart type cannot render the selected data."
+other = "chart type {{.Type}} cannot render this data: {{.Reason}}"
+
+["cli.error.too_small"]
+description = "The terminal or requested frame is too small."
+other = "terminal too small; need at least {{.Width}}x{{.Height}}"
+
+["cli.error.too_many_bars"]
+description = "Too many bar categories for the frame width."
+other = "too many bars ({{.Count}}) for width {{.Width}}; use --type line or a smaller dataset"
+
+["cli.error.no_values"]
+description = "The selected series contain no non-null values."
+other = "no plottable values"
+
+["cli.error.internal"]
+description = "An unexpected internal failure."
+other = "internal error: {{.Detail}}"
+
+["cli.error.multiple_files"]
+description = "Multiple positional files are not implemented yet."
+other = "multiple files are not implemented yet; pass one file"
+
+["cli.error.invalid_delimiter"]
+description = "The delimiter value is invalid."
+other = "invalid delimiter {{.Value}}"
+
+["cli.error.invalid_color"]
+description = "The color mode value is invalid."
+other = "invalid color mode {{.Value}}; use auto, always or never"
+
+["cli.error.invalid_type"]
+description = "The chart type value is invalid."
+other = "invalid chart type {{.Value}}; use line, bar, plot or graph"
+
+["cli.error.width"]
+description = "The width flag is out of range."
+other = "--width must be between {{.Min}} and {{.Max}}"
+
+["cli.error.height"]
+description = "The height flag is out of range."
+other = "--height must be between {{.Min}} and {{.Max}}"
+
+["cli.error.header_conflict"]
+description = "Both header flags were supplied."
+other = "use only one of --header and --no-header"
+
+["cli.warn.empty_column"]
+description = "An empty column was ignored."
+other = "column {{.Name}} is empty and was ignored"
+
+["cli.warn.duplicate_header"]
+description = "A duplicate header was renamed."
+other = "duplicate header {{.Name}}; renamed to {{.New}}"
+
+["cli.warn.ragged_row"]
+description = "A record had the wrong number of fields."
+other = "record {{.Line}}: expected {{.Expected}} fields, got {{.Got}}; padded or truncated"
+
+["cli.warn.multiple_labels"]
+description = "Several label columns were found; the first was used."
+other = "multiple label columns ({{.Columns}}); using {{.Used}}"
+
+["cli.warn.ordinal_axis"]
+description = "Categorical data exceeded the bar threshold and uses row order."
+other = "{{.Rows}} categories exceed the bar limit; using row order (try --type bar or a smaller dataset)"
+
+["cli.warn.series_truncated"]
+description = "Only the first N series were plotted."
+other = "showing {{.Shown}} of {{.Total}} series"

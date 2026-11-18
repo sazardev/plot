@@ -1,0 +1,21 @@
+package domain_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/sazar/plot/internal/domain"
+)
+
+func TestSanitizeTextRemovesControlAndBidiCharacters(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "a [31mb", domain.SanitizeText("a\x1b[31mb"))
+	assert.Equal(t, "a b", domain.SanitizeText("a\nb"))
+	assert.Equal(t, "a b", domain.SanitizeText("a\tb"))
+	assert.Equal(t, "a b", domain.SanitizeText("a\u202eb"))
+	assert.Equal(t, "a b", domain.SanitizeText("a\u2028b"))
+	assert.Equal(t, "a\uFFFD", domain.SanitizeText("a\xff"))
+	assert.Equal(t, "café", domain.SanitizeText("café"))
+}
