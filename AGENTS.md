@@ -2,7 +2,7 @@
 
 ## Project
 
-`pl` is a fast terminal data plotter written in Go with the Charm stack (Bubble Tea, Lip Gloss, Bubbles). It reads tabular data from stdin pipes (`psql -c "..." | pl`), CSV files, or a configured database query, infers columns and chart type automatically, and renders 2D plots, bar graphs, donut and pie charts as terminal characters. CLI mode is the default and is pipe-friendly; `--tui` opts into an interactive, animated view. Users are shell users and CSV analysts who want a chart without leaving the terminal.
+`pl` is a fast terminal data plotter written in Go with the Charm stack (Bubble Tea, Lip Gloss, Bubbles). It reads tabular data from stdin pipes (`psql --csv -c "..." | pl`), CSV files, or a configured database query, infers columns and chart type automatically, and renders 2D plots, bar graphs, donut and pie charts as terminal characters. CLI mode is the default and is pipe-friendly; `--tui` opts into an interactive, animated view. Users are shell users and CSV analysts who want a chart without leaving the terminal.
 
 ## Read first
 
@@ -10,22 +10,22 @@
 - [DESIGN.md](DESIGN.md): the design system: tokens, components and UI rules.
 - [SPEC.md](SPEC.md): what is being built: requirements, acceptance criteria and open questions.
 
-Read the code around a change before writing: no `*.go` files, `Makefile` or `go.mod` exist in this tree yet, so confirm the real names before relying on any command below.
+Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input, `internal/render` draws, and `internal/ui` holds the theme (and later the TUI). A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
 
 ## Commands
 
 | Task | Command |
 | --- | --- |
 | Install dependencies | `go mod download` |
-| Build everything | `go build ./...` |
-| Build the binary | `go build -o pl ./cmd/app` |
+| Build everything | `CGO_ENABLED=0 go build ./...` |
+| Build the binary | `CGO_ENABLED=0 go build -o pl ./cmd/app` |
 | Run on a file | `go run ./cmd/app data.csv` |
 | Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/app` |
-| Run the TUI | `go run ./cmd/app --tui data.csv` |
+| Run the TUI | `go run ./cmd/app --tui data.csv` (milestone 4, not implemented yet) |
 | All tests | `go test ./...` |
-| Single test | `go test ./internal/domain -run TestTask_Validate -v` |
+| Single test | `go test ./internal/domain -run TestInferClassifiesColumnsAndValues -v` |
 | Race detector | `go test -race ./...` |
-| Update teatest goldens | `go test ./internal/ui/... -update` |
+| Update render goldens | `go test ./internal/render -update` |
 | Vet | `go vet ./...` |
 | Format | `gofmt -l -w .` |
 | Lint | `golangci-lint run` (v2) |
@@ -40,22 +40,21 @@ Read the code around a change before writing: no `*.go` files, `Makefile` or `go
 ## Layout
 
 ```
-cmd/app/            entry point: flags, config load, builds the root model, tea.NewProgram(...).Run()
-internal/domain/    plain Go types and rules (Task, TaskStore port); no Bubble Tea, no Lip Gloss
-internal/storage/   implements the domain ports (file/SQLite on disk)
-internal/ui/        app.go root model, keys.go, styles.go, msgs.go, commands.go
-internal/ui/screens/    one folder per screen, each split into model.go, update.go, view.go
-internal/ui/components/ one reusable component per file (statusbar.go)
-internal/i18n/      bundle setup plus active.<lang>.toml message files (go:embed)
-internal/db/        sqlc-generated code, committed, never hand-edited
-db/migrations/      forward-only goose SQL migrations
-db/queries/         one .sql file per aggregate, queries named with `-- name: GetX :one`
-internal/testutil/  builders, fixtures, fake clock and fake clients
-testdata/           teatest golden files (*.golden) and sample inputs
-.github/workflows/  CI: lint, test, build
+cmd/app/            entry point: flags, source selection, CLI pipeline, exit codes
+internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, inference); no Bubble Tea/Lip Gloss
+internal/storage/   delimited input parsing (stdin/CSV); SQLite and cache adapters arrive later
+internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
+internal/ui/        styles.go theme; TUI root/screens/components arrive in milestone 4
+internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)
+internal/testutil/  golden helper; builders and fakes arrive with more tests
+internal/db/        sqlc-generated cache code (future)
+db/migrations/      forward-only goose SQL migrations (future)
+db/queries/         one .sql file per aggregate (future)
+testdata/           sample inputs; render goldens live in internal/render/testdata
+.github/workflows/  CI: lint, test, build (future)
 ```
 
-Dependency direction: `cmd → ui → domain ← storage`. `domain` never imports Bubble Tea or Lip Gloss; `storage` depends on `domain` ports only; screens never import each other and talk through messages handled by `ui/app.go`.
+Dependency direction: `cmd → ui → render → domain` and `cmd → storage → domain`. `domain` never imports Bubble Tea or Lip Gloss; `storage` depends on `domain` ports only; screens never import each other and talk through messages handled by `ui/app.go`.
 
 ## Conventions
 
@@ -102,6 +101,5 @@ Dependency direction: `cmd → ui → domain ← storage`. `domain` never import
 - [ ] Docs (STACK/DESIGN/SPEC) still true; changed commands are reflected in this file.
 - [ ] Diff is minimal: no unrelated files, no leftover debug output, no secrets.
 - [ ] Commit message follows Conventional Commits.
-- `TODO:` add the exit-code table (SPEC only pins FR-2's "distinct non-zero code") once decided.
 
-`TODO:` STACK.md describes SQLite as the database but its data-access row names the `pgx` driver; confirm which engine `sqlc.yaml` targets before generating queries or writing migrations.
+`TODO:` STACK.md's SQLite/pgx data-access contradiction is resolved by SPEC.md §15 (SQLite + pure-Go driver); update STACK.md before the cache milestone.
