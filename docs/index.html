@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pl — beautiful charts in your terminal</title>
-  <meta name="description" content="pl turns pipes, CSVs and SQLite queries into clean terminal charts in milliseconds. Paste CSV, Markdown, JSON, SQL, Excel or SQLite into the browser playground. One static Go binary with an optional TUI.">
+  <meta name="description" content="pl turns pipes, CSVs and SQLite queries into clean terminal charts in milliseconds. Paste CSV, Markdown, JSON, SQL, Excel or SQLite into the browser playground, then export or save the chart. One static Go binary with an optional TUI.">
   <meta name="theme-color" content="#f2f0e9">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0d0a">
   <link rel="canonical" href="https://sazardev.github.io/plot/">
@@ -139,7 +139,8 @@
         </div>
         <p>
           A browser-side sandbox for the same tables you would feed <code>pl</code>:
-          CSV, TSV, Markdown, JSON, SQL, Excel and SQLite. Nothing leaves your machine.
+          CSV, TSV, Markdown, JSON, SQL, Excel and SQLite. Export the chart, save it, or ask the local data agent.
+          Nothing leaves your machine.
         </p>
       </div>
 
@@ -150,6 +151,7 @@
             <div class="pg-tabs" role="tablist" aria-label="Input mode">
               <button class="is-active" type="button" role="tab" aria-selected="true" data-pg-tab="paste">Paste</button>
               <button type="button" role="tab" aria-selected="false" data-pg-tab="file">Upload</button>
+              <button type="button" role="tab" aria-selected="false" data-pg-tab="agent">Agent</button>
             </div>
           </div>
 
@@ -189,6 +191,30 @@
             </div>
           </div>
 
+
+          <div data-pg-pane="agent" hidden>
+            <div class="pg-agent-status">
+              <span class="pg-agent-dot" aria-hidden="true"></span>
+              <strong>Local data agent</strong>
+              <span data-pg-agent-state>ready</span>
+            </div>
+            <div class="pg-agent-log" data-pg-agent-log role="log" aria-live="polite" aria-label="Agent messages" tabindex="0"></div>
+            <div class="pg-agent-skills" aria-label="Agent skills">
+              <button type="button" data-agent-skill="status">Status</button>
+              <button type="button" data-agent-skill="audit">Audit</button>
+              <button type="button" data-agent-skill="fix">Fix data</button>
+              <button type="button" data-agent-skill="recommend">Recommend</button>
+              <button type="button" data-agent-skill="guide">Guide</button>
+              <button type="button" data-agent-skill="export">Export</button>
+              <button type="button" data-agent-skill="help">Help</button>
+            </div>
+            <form class="pg-agent-form" data-pg-agent-form>
+              <label class="sr-only" for="pg-agent-input">Ask the local agent</label>
+              <input id="pg-agent-input" type="text" data-pg-agent-input autocomplete="off" placeholder="Ask: status, fix, recommend, export PNG, history…">
+              <button type="submit">Send</button>
+            </form>
+            <p class="pg-agent-note">Runs locally with deterministic rules. No model calls, no upload.</p>
+          </div>
           <div class="pg-actions">
             <button type="button" class="pg-button" data-pg-action="sample">Load sample</button>
             <button type="button" class="pg-button is-primary" data-pg-action="render">Render chart <span aria-hidden="true">→</span></button>
@@ -247,8 +273,20 @@
           <div class="pg-out-foot">
             <span data-pg-meta>Waiting for data</span>
             <div class="pg-out-actions">
+              <button type="button" class="pg-tool" data-pg-action="save" disabled>Save plot</button>
+              <details class="pg-menu" data-pg-export-menu>
+                <summary class="pg-tool">Export</summary>
+                <div class="pg-menu-panel">
+                  <button type="button" data-pg-export="png">PNG image</button>
+                  <button type="button" data-pg-export="jpg">JPG image</button>
+                  <button type="button" data-pg-export="webp">WebP image</button>
+                  <button type="button" data-pg-export="pdf">PDF document</button>
+                </div>
+              </details>
+              <button type="button" class="pg-tool" data-pg-action="history">History <span class="pg-badge" data-pg-history-count>0</span></button>
+              <span class="pg-vsep" aria-hidden="true"></span>
               <button type="button" class="pg-link" data-pg-action="download" disabled>Download CSV</button>
-              <button type="button" class="pg-link" data-pg-action="copy-command" disabled>Copy pl command</button>
+              <button type="button" class="pg-link" data-pg-action="copy-command" disabled>Copy command</button>
             </div>
           </div>
 
@@ -259,6 +297,25 @@
         </div>
       </div>
     </section>
+
+    <div class="pg-modal" data-pg-history-modal hidden>
+      <div class="pg-modal-backdrop" data-pg-history-close></div>
+      <div class="pg-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pg-history-title">
+        <div class="pg-modal-head">
+          <div>
+            <span class="pg-step">Local history</span>
+            <h3 id="pg-history-title">Saved plots</h3>
+          </div>
+          <div class="pg-modal-actions">
+            <button type="button" class="pg-link" data-pg-action="clear-history">Clear all</button>
+            <button type="button" class="pg-modal-close" data-pg-history-close aria-label="Close history">×</button>
+          </div>
+        </div>
+        <p class="pg-modal-copy">Snapshots live in this browser only. Restoring one brings back its data and chart settings.</p>
+        <div class="pg-history-list" data-pg-history-list></div>
+        <p class="pg-history-empty" data-pg-history-empty>No saved plots yet. Build a chart and press <strong>Save plot</strong>.</p>
+      </div>
+    </div>
 
     <section class="wrap section" id="why" aria-labelledby="why-title">
       <div class="section-head">
@@ -504,8 +561,9 @@ psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
               </table>
             </div>
             <p class="callout">
-              The playground can download a normalized CSV. Copy the generated <code>pl pl-playground.csv</code>
-              command to reproduce the same data in your terminal.
+              The playground also has a local data agent (status, audit, safe fixes, chart recommendation), PNG/JPG/WebP/PDF
+              export, and a browser-local history of saved plots. It can download a normalized CSV and copy the generated
+              <code>pl pl-playground.csv</code> command to reproduce the same data in your terminal.
             </p>
           </article>
           <article class="doc-block" id="charts-guide">

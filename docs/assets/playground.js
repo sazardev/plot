@@ -32,6 +32,16 @@
     controls: $("[data-pg-controls]"),
     label: $("[data-pg-label]"),
     series: $("[data-pg-series]"),
+    save: $('[data-pg-action="save"]'),
+    historyButton: $('[data-pg-action="history"]'),
+    historyCount: $("[data-pg-history-count]"),
+    historyModal: document.querySelector("[data-pg-history-modal]"),
+    historyList: document.querySelector("[data-pg-history-list]"),
+    historyEmpty: document.querySelector("[data-pg-history-empty]"),
+    agentForm: $("[data-pg-agent-form]"),
+    agentInput: $("[data-pg-agent-input]"),
+    agentLog: $("[data-pg-agent-log]"),
+    agentState: $("[data-pg-agent-state]"),
   };
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -43,6 +53,9 @@
   let chart = null;
   let labelIndex = -1;
   let selectedSeries = new Set();
+  let savedPlots = [];
+  let pdfLoad = null;
+  let historyReturnFocus = null;
   let workbook = null;
   let workbookName = "";
   let sqlDb = null;
@@ -460,10 +473,16 @@
     els.meta.textContent = `${next.rows.length.toLocaleString("en")} rows × ${next.columns.length.toLocaleString("en")} columns · ${next.source}${truncated}`;
     els.download.disabled = false;
     els.copyCommand.disabled = false;
+    els.save.disabled = false;
+    setAgentState(`ready · ${next.rows.length}×${next.columns.length}`);
     setStatus(status, "ok");
     renderControls();
     renderPreview();
     drawChart();
+    if (els.agentLog) {
+      els.agentLog.textContent = "";
+      agentGreeting();
+    }
   };
 
   const renderPreview = () => {
@@ -509,6 +528,13 @@
   };
 
   const chartType = () => $$("[data-pg-chart]").find((button) => button.classList.contains("is-active"))?.dataset.pgChart || "line";
+
+  const setChartType = (type) => {
+    const button = $$("[data-pg-chart]").find((candidate) => candidate.dataset.pgChart === type);
+    if (!button) return;
+    setActive("[data-pg-chart]", button);
+    drawChart();
+  };
 
   const showEmpty = (title, message) => {
     els.canvas.hidden = true;
@@ -613,6 +639,7 @@
   const chartOptions = () => ({
     responsive: true,
     maintainAspectRatio: false,
+    devicePixelRatio: Math.max(2, window.devicePixelRatio || 1),
     animation: reduceMotion ? false : { duration: 420 },
     interaction: { mode: "index", intersect: false },
     plugins: {
@@ -970,6 +997,7 @@
     link.remove();
     URL.revokeObjectURL(url);
     setStatus("CSV downloaded. Run `pl pl-playground.csv` to render it in your terminal.", "ok");
+    return true;
   };
 
   const copyCommand = async () => {
@@ -986,6 +1014,695 @@
     } catch {
       setStatus(`Copy this command: ${command}`, "ok");
     }
+  };
+
+  const slugify = (value) =>
+    String(value || "pl-chart")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 64) || "pl-chart";
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const canvasBlob = (canvas, type, quality) =>
+    new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not encode the chart."))), type, quality);
+    });
+
+  const ensurePDF = async () => {
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    if (!pdfLoad) {
+      pdfLoad = loadScript("assets/vendor/jspdf.umd.min.js").then(() => {
+        if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library did not initialize.");
+        return window.jspdf.jsPDF;
+      });
+    }
+    return pdfLoad;
+  };
+
+  const fitText = (context, text, maxWidth) => {
+    if (context.measureText(text).width <= maxWidth) return text;
+    let clipped = text;
+    while (clipped.length > 1 && context.measureText(`${clipped}…`).width > maxWidth) {
+      clipped = clipped.slice(0, -1);
+    }
+    return `${clipped}…`;
+  };
+
+  const composeCanvas = (targetWidth) => {
+    if (!table || !chart) throw new Error("Nothing to export yet.");
+    const source = els.canvas;
+    if (!source.width || !source.height) throw new Error("The chart is still rendering. Try again in a moment.");
+    const width = targetWidth || source.width;
+    const ratio = width / source.width;
+    const pad = Math.max(18, Math.round(34 * ratio));
+    const header = Math.max(54, Math.round(86 * ratio));
+    const footer = Math.max(30, Math.round(50 * ratio));
+    const chartWidth = Math.max(1, width - pad * 2);
+    const chartHeight = Math.max(1, Math.round(source.height * (chartWidth / source.width)));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = header + chartHeight + footer;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#171824";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.textAlign = "left";
+    context.textBaseline = "alphabetic";
+    context.fillStyle = "#f2f4e9";
+    context.font = `600 ${Math.max(14, Math.round(27 * ratio))}px Geist, sans-serif`;
+    context.fillText(fitText(context, table.title, chartWidth), pad, Math.max(20, Math.round(header * 0.48)));
+
+    context.fillStyle = "#8d9284";
+    context.font = `${Math.max(8, Math.round(10.5 * ratio))}px "Geist Mono", monospace`;
+    context.fillText(
+      `${chartType()} · ${table.rows.length} rows × ${table.columns.length} columns`,
+      pad,
+      Math.max(31, Math.round(header * 0.8))
+    );
+
+    context.drawImage(source, pad, header, chartWidth, chartHeight);
+
+    context.fillStyle = "#8d9284";
+    context.font = `${Math.max(7, Math.round(8.5 * ratio))}px "Geist Mono", monospace`;
+    const footerBaseline = header + chartHeight + Math.max(19, Math.round(footer * 0.66));
+    context.fillText(`pl · terminal charts · ${new Date().toISOString().slice(0, 10)}`, pad, footerBaseline);
+    context.textAlign = "right";
+    context.fillText("github.com/sazardev/plot", width - pad, footerBaseline);
+    return canvas;
+  };
+
+  const closeExportMenu = () => {
+    const menu = $("[data-pg-export-menu]");
+    if (menu) menu.open = false;
+  };
+
+  const exportImage = async (format) => {
+    if (!table || !chart) {
+      setStatus("Render a chart before exporting.", "error");
+      return;
+    }
+    setAgentState("exporting");
+    try {
+      if (format === "pdf") {
+        const jsPDF = await ensurePDF();
+        const canvas = composeCanvas(Math.max(1600, els.canvas.width));
+        const landscape = canvas.width >= canvas.height;
+        const pdf = new jsPDF({ orientation: landscape ? "landscape" : "portrait", unit: "pt", format: "a4" });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 28;
+        const fit = Math.min((pageWidth - margin * 2) / canvas.width, (pageHeight - margin * 2) / canvas.height);
+        const imageWidth = canvas.width * fit;
+        const imageHeight = canvas.height * fit;
+        pdf.setProperties({ title: table.title, creator: "pl playground" });
+        pdf.addImage(
+          canvas.toDataURL("image/jpeg", 0.92),
+          "JPEG",
+          (pageWidth - imageWidth) / 2,
+          (pageHeight - imageHeight) / 2,
+          imageWidth,
+          imageHeight
+        );
+        pdf.save(`${slugify(table.title)}.pdf`);
+      } else {
+        const canvas = composeCanvas(Math.max(1600, els.canvas.width));
+        const mime = format === "jpg" ? "image/jpeg" : `image/${format}`;
+        const blob = await canvasBlob(canvas, mime, 0.93);
+        downloadBlob(blob, `${slugify(table.title)}.${format}`);
+      }
+      setStatus(`Exported ${format.toUpperCase()} · ${slugify(table.title)}.${format}`, "ok");
+      closeExportMenu();
+      return true;
+    } catch (error) {
+      setStatus(`Export failed: ${error.message}`, "error");
+      return false;
+    } finally {
+      setAgentState(table ? "ready" : "waiting for data");
+    }
+  };
+
+  const HISTORY_KEY = "pl-playground-history-v1";
+  const MAX_HISTORY = 8;
+  const MAX_HISTORY_ROWS = 2000;
+
+  const readHistory = () => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed
+            .filter((item) => item && item.id && Array.isArray(item.columns) && Array.isArray(item.rows) && Array.isArray(item.numeric))
+            .slice(0, MAX_HISTORY)
+        : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const persistHistory = () => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(savedPlots));
+        return true;
+      } catch {
+        if (savedPlots.length <= 1) break;
+        savedPlots.pop();
+      }
+    }
+    return false;
+  };
+
+  const updateHistoryCount = () => {
+    if (els.historyCount) els.historyCount.textContent = String(savedPlots.length);
+  };
+
+  const formatHistoryDate = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "saved";
+    try {
+      return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+    } catch {
+      return date.toLocaleString();
+    }
+  };
+
+  const renderHistory = () => {
+    if (!els.historyList) return;
+    els.historyList.textContent = "";
+    if (els.historyEmpty) els.historyEmpty.classList.toggle("is-visible", savedPlots.length === 0);
+    savedPlots.forEach((item) => {
+      const card = document.createElement("article");
+      card.className = "pg-history-card";
+
+      const image = document.createElement("img");
+      image.src = item.thumbnail || "";
+      image.alt = `${item.title} saved chart`;
+      image.loading = "lazy";
+      card.appendChild(image);
+
+      const body = document.createElement("div");
+      body.className = "pg-history-body";
+      const heading = document.createElement("h4");
+      heading.textContent = item.title || "Saved plot";
+      const meta = document.createElement("p");
+      meta.textContent = `${item.chartType || "line"} · ${item.rows.length} rows × ${item.columns.length} columns · ${formatHistoryDate(item.createdAt)}`;
+      body.append(heading, meta);
+      card.appendChild(body);
+
+      const actions = document.createElement("div");
+      actions.className = "pg-history-actions";
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.textContent = "Restore";
+      restore.addEventListener("click", () => restoreHistory(item.id));
+      const download = document.createElement("button");
+      download.type = "button";
+      download.textContent = "Download PNG";
+      download.addEventListener("click", () => {
+        const link = document.createElement("a");
+        link.href = item.thumbnail;
+        link.download = `${slugify(item.title)}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "is-danger";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", () => deleteHistory(item.id));
+      actions.append(restore, download, remove);
+      card.appendChild(actions);
+      els.historyList.appendChild(card);
+    });
+  };
+
+  const openHistory = () => {
+    if (!els.historyModal) return;
+    renderHistory();
+    historyReturnFocus = document.activeElement;
+    els.historyModal.hidden = false;
+    document.body.classList.add("pg-modal-open");
+    const close = $("[data-pg-history-close]", els.historyModal);
+    if (close) close.focus();
+  };
+
+  const closeHistory = () => {
+    if (!els.historyModal || els.historyModal.hidden) return;
+    els.historyModal.hidden = true;
+    document.body.classList.remove("pg-modal-open");
+    if (historyReturnFocus && typeof historyReturnFocus.focus === "function") historyReturnFocus.focus();
+  };
+
+  const saveHistory = () => {
+    if (!table || !chart) {
+      setStatus("Render a chart before saving.", "error");
+      return false;
+    }
+    try {
+      const thumbnail = composeCanvas(560).toDataURL("image/png");
+      const snapshot = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        createdAt: Date.now(),
+        title: table.title,
+        chartType: chartType(),
+        labelIndex,
+        selectedSeries: Array.from(selectedSeries),
+        columns: table.columns.slice(),
+        rows: table.rows.slice(0, MAX_HISTORY_ROWS).map((row) => row.slice()),
+        numeric: table.numeric.slice(),
+        source: table.source,
+        truncated: table.truncated || table.rows.length > MAX_HISTORY_ROWS,
+        thumbnail,
+      };
+      savedPlots.unshift(snapshot);
+      savedPlots = savedPlots.slice(0, MAX_HISTORY);
+      if (!persistHistory()) {
+        savedPlots = savedPlots.filter((item) => item.id !== snapshot.id);
+        throw new Error("Browser storage is full; delete an old saved plot first.");
+      }
+      updateHistoryCount();
+      renderHistory();
+      setStatus(`Saved “${table.title}” to local history.`, "ok");
+      setAgentState("saved");
+      return true;
+    } catch (error) {
+      setStatus(`Could not save plot: ${error.message}`, "error");
+      return false;
+    }
+  };
+
+  const deleteHistory = (id) => {
+    savedPlots = savedPlots.filter((item) => item.id !== id);
+    persistHistory();
+    updateHistoryCount();
+    renderHistory();
+    setStatus("Saved plot deleted.", "ok");
+  };
+
+  const clearHistory = () => {
+    if (!savedPlots.length) return;
+    if (!window.confirm("Delete every saved plot from this browser?")) return;
+    savedPlots = [];
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch {
+      /* ignore storage failures */
+    }
+    updateHistoryCount();
+    renderHistory();
+    setStatus("Local plot history cleared.", "ok");
+  };
+
+  const restoreHistory = (id) => {
+    const item = savedPlots.find((candidate) => candidate.id === id);
+    if (!item) return;
+    table = {
+      columns: item.columns.slice(),
+      rows: item.rows.map((row) => row.slice()),
+      numeric: item.numeric.slice(),
+      title: item.title,
+      source: `${item.source} · saved`,
+      truncated: Boolean(item.truncated),
+    };
+    labelIndex = Number.isInteger(item.labelIndex) ? item.labelIndex : -1;
+    selectedSeries = new Set(item.selectedSeries || []);
+    if (!selectedSeries.size) {
+      const defaults = selectChartColumns(table);
+      selectedSeries = new Set(defaults.values);
+      if (!Number.isInteger(item.labelIndex)) labelIndex = defaults.label;
+    }
+    const typeButton = $$("[data-pg-chart]").find((button) => button.dataset.pgChart === item.chartType);
+    if (typeButton) setActive("[data-pg-chart]", typeButton);
+    els.title.textContent = table.title;
+    const truncated = table.truncated ? ` · snapshot of first ${MAX_HISTORY_ROWS} rows` : "";
+    els.meta.textContent = `${table.rows.length.toLocaleString("en")} rows × ${table.columns.length.toLocaleString("en")} columns · ${table.source}${truncated}`;
+    els.download.disabled = false;
+    els.copyCommand.disabled = false;
+    els.save.disabled = false;
+    renderControls();
+    renderPreview();
+    drawChart();
+    closeHistory();
+    setStatus(`Restored “${table.title}”.`, "ok");
+    setAgentState("ready · restored");
+    els.agentLog.textContent = "";
+    agentGreeting();
+  };
+
+  const duplicateRows = () => {
+    if (!table) return 0;
+    const seen = new Set();
+    let duplicates = 0;
+    table.rows.forEach((row) => {
+      const key = JSON.stringify(row);
+      if (seen.has(key)) duplicates++;
+      else seen.add(key);
+    });
+    return duplicates;
+  };
+
+  const allNullColumns = () => {
+    if (!table) return [];
+    return table.columns
+      .map((column, index) => (table.rows.every((row) => row[index] === null) ? column : null))
+      .filter(Boolean);
+  };
+
+  const setAgentState = (value) => {
+    if (els.agentState) els.agentState.textContent = value;
+  };
+
+  const agentMessage = (role, text, action) => {
+    if (!els.agentLog) return;
+    const message = document.createElement("div");
+    message.className = `pg-agent-msg${role === "user" ? " is-user" : ""}`;
+    if (role === "user") {
+      const strong = document.createElement("strong");
+      strong.textContent = "You";
+      message.appendChild(strong);
+      message.appendChild(document.createTextNode(`\n${text}`));
+    } else {
+      const strong = document.createElement("strong");
+      strong.textContent = "pl agent";
+      message.appendChild(strong);
+      message.appendChild(document.createTextNode(`\n${text}`));
+    }
+    if (action && action.label && typeof action.run === "function") {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pg-agent-action";
+      button.textContent = action.label;
+      button.addEventListener("click", action.run);
+      message.appendChild(button);
+    }
+    els.agentLog.appendChild(message);
+    els.agentLog.scrollTop = els.agentLog.scrollHeight;
+  };
+
+  const agentSay = (text, action) => agentMessage("agent", text, action);
+  const agentUser = (text) => agentMessage("user", text);
+
+  const agentStatus = () => {
+    if (!table) {
+      agentSay("No table loaded yet. Paste data, drop a file, or press Load sample.");
+      return;
+    }
+    const values = selectedValues();
+    const label = labelIndex >= 0 ? table.columns[labelIndex] : "row number";
+    const nulls = table.rows.reduce((total, row) => total + row.filter((value) => value === null).length, 0);
+    agentSay(
+      [
+        `${table.rows.length} rows × ${table.columns.length} columns · ${table.source}.`,
+        `Label: ${label}. Series: ${values.length ? values.map((index) => table.columns[index]).join(", ") : "none"}.`,
+        `Numeric columns: ${table.numeric.filter(Boolean).length}. Empty cells: ${nulls}. Duplicate rows: ${duplicateRows()}.`,
+        `Current chart: ${chartType()}. Saved plots: ${savedPlots.length}. Export and history are ready.`,
+      ].join("\n")
+    );
+  };
+
+  const agentAudit = () => {
+    if (!table) {
+      agentSay("Load data first, then I can audit it.");
+      return;
+    }
+    const issues = [];
+    const duplicates = duplicateRows();
+    if (duplicates) issues.push(`${duplicates} duplicate row${duplicates === 1 ? "" : "s"} can be removed.`);
+    table.columns.forEach((column, index) => {
+      const empty = table.rows.filter((row) => row[index] === null).length;
+      if (!empty) return;
+      const ratio = empty / table.rows.length;
+      issues.push(`${column}: ${empty} empty cell${empty === 1 ? "" : "s"}${ratio > 0.5 ? " (mostly empty)" : ""}.`);
+    });
+    const mixed = table.columns.filter((_, index) => {
+      if (table.numeric[index]) return false;
+      let numbers = 0;
+      let texts = 0;
+      table.rows.forEach((row) => {
+        if (row[index] === null) return;
+        if (typeof row[index] === "number") numbers++;
+        else texts++;
+      });
+      return numbers > 0 && texts > 0;
+    });
+    if (mixed.length) issues.push(`Mixed number/text columns: ${mixed.join(", ")}. Fix the source or rename the label.`);
+    const nullColumns = allNullColumns();
+    if (nullColumns.length) issues.push(`Empty columns: ${nullColumns.join(", ")}.`);
+    if (labelIndex < 0) issues.push("No text label column; row numbers will be used for labels.");
+    if (table.numeric.filter(Boolean).length > 8) issues.push("More than 8 numeric series; line charts use the first 8.");
+    if (table.truncated) issues.push(`Only the first ${MAX_ROWS.toLocaleString("en")} rows are loaded.`);
+    if ((chartType() === "pie" || chartType() === "donut") && selectedValues().length) {
+      const index = selectedValues()[0];
+      if (table.rows.some((row) => typeof row[index] === "number" && row[index] < 0)) {
+        issues.push("Pie and donut ignore negative values; use bar or line.");
+      }
+    }
+    if (!issues.length) {
+      agentSay("Audit complete. I found no obvious issues in the current table.");
+      return;
+    }
+    agentSay(`Audit found ${issues.length} note${issues.length === 1 ? "" : "s"}:\n• ${issues.join("\n• ")}`, {
+      label: duplicates || nullColumns.length ? "Apply safe fixes" : "Recommend a chart",
+      run: () => (duplicates || nullColumns.length ? agentFix() : agentRecommend()),
+    });
+  };
+
+  const agentFix = () => {
+    if (!table) {
+      agentSay("Load data first, then I can clean it.");
+      return;
+    }
+    const keep = table.columns.map((_, index) => table.rows.some((row) => row[index] !== null));
+    if (!keep.some(Boolean)) {
+      agentSay("Every column is empty; there is nothing safe to keep.");
+      return;
+    }
+    const keptColumns = table.columns.filter((_, index) => keep[index]);
+    const keptNumeric = table.numeric.filter((_, index) => keep[index]);
+    const projected = table.rows.map((row) => row.filter((_, index) => keep[index]));
+    const seen = new Set();
+    const rows = [];
+    projected.forEach((row) => {
+      const key = JSON.stringify(row);
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    });
+    const removedRows = table.rows.length - rows.length;
+    const removedColumns = table.columns.length - keptColumns.length;
+    if (!removedRows && !removedColumns) {
+      agentSay("Nothing safe to fix automatically. I do not fill empty values or invent data.");
+      return;
+    }
+    table = {
+      ...table,
+      columns: keptColumns,
+      rows,
+      numeric: keptNumeric,
+      truncated: table.truncated,
+    };
+    const defaults = selectChartColumns(table);
+    labelIndex = defaults.label;
+    selectedSeries = new Set(defaults.values);
+    els.title.textContent = table.title;
+    const truncated = table.truncated ? ` · showing first ${MAX_ROWS.toLocaleString("en")}` : "";
+    els.meta.textContent = `${table.rows.length} rows × ${table.columns.length} columns · ${table.source}${truncated}`;
+    els.download.disabled = false;
+    els.copyCommand.disabled = false;
+    els.save.disabled = false;
+    renderControls();
+    renderPreview();
+    drawChart();
+    const details = [];
+    if (removedRows) details.push(`${removedRows} duplicate row${removedRows === 1 ? "" : "s"}`);
+    if (removedColumns) details.push(`${removedColumns} empty column${removedColumns === 1 ? "" : "s"}`);
+    setStatus(`Cleaned ${details.join(" and ")}.`, "ok");
+    agentSay(`Safe fixes applied: removed ${details.join(" and ")}. No values were filled or invented.`);
+  };
+
+  const agentRecommend = () => {
+    if (!table) {
+      agentSay("Load data first, then I can recommend a chart.");
+      return;
+    }
+    const values = selectedValues();
+    if (!values.length) {
+      agentSay("There is no numeric series to plot yet.");
+      return;
+    }
+    let recommended = "line";
+    if (values.length === 1) {
+      if (labelIndex >= 0 && table.rows.length >= 2 && table.rows.length <= 8) recommended = "pie";
+      else if (table.rows.length <= 30) recommended = "bar";
+    }
+    setChartType(recommended);
+    agentSay(
+      `Recommended ${recommended}. ${values.length} numeric series, ${table.rows.length} rows, label: ${
+        labelIndex >= 0 ? table.columns[labelIndex] : "row number"
+      }.`
+    );
+  };
+
+  const agentGuide = () => {
+    agentSay(
+      [
+        "How to use the playground:",
+        "1. Paste from the clipboard or upload a file. CSV, TSV, Markdown, JSON, SQL dumps, XLSX/XLS and SQLite are supported.",
+        "2. Pick a label column and the series you want with the chips above the chart.",
+        "3. Switch between line, bar, pie and donut. Bar and pie/donut use the first selected series.",
+        "4. Export PNG, JPG, WebP or PDF from the Export menu. Save stores a local snapshot in History.",
+        "",
+        "For PostgreSQL or MySQL, paste the query result here, or run this in your terminal:",
+        "psql --csv -c \"select ...\" | pl",
+      ].join("\n")
+    );
+  };
+
+  const agentHelp = () => {
+    agentSay(
+      [
+        "I read the current table and the playground state. Skills:",
+        "• Status — rows, columns, label, series, nulls and chart.",
+        "• Audit — find duplicates, empty cells, empty columns and chart-fit issues.",
+        "• Fix data — remove duplicate rows and empty columns safely.",
+        "• Recommend — choose line, bar, pie or donut from the data.",
+        "• Guide — step-by-step use and input formats.",
+        "• Export — PNG, JPG, WebP or PDF; Save and History are next to the chart.",
+        "",
+        "You can also type: status, audit, fix, recommend, line, bar, pie, donut, export png, export pdf, save, history, csv or help.",
+        "Formats: CSV, TSV, Markdown, JSON, SQL, Excel, SQLite and clipboard. I never call a model or upload data.",
+      ].join("\n")
+    );
+  };
+
+  const agentCommand = async (text) => {
+    const normalized = text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const format = normalized.match(/\b(png|jpg|jpeg|webp|pdf)\b/);
+    if (/(export|exporta|descarg|download)/.test(normalized)) {
+      if (format) {
+        const ok = await exportImage(format[1] === "jpeg" ? "jpg" : format[1]);
+        if (ok) agentSay(`Exported ${format[1].toUpperCase()} with the current plot and data summary.`);
+      } else if (/csv/.test(normalized)) {
+        downloadCSV();
+        agentSay("Downloaded the current table as pl-playground.csv.");
+      } else {
+        agentSay("Export formats: PNG, JPG, WebP or PDF. Say, for example, “export png”.");
+      }
+      return;
+    }
+    if (/(historial|history)/.test(normalized)) {
+      openHistory();
+      agentSay("Opened local history. Saved plots stay in this browser.");
+      return;
+    }
+    if (/(guarda|guardar|save)/.test(normalized)) {
+      if (saveHistory()) agentSay(`Saved “${table.title}” to local history. Open History to restore or download it.`);
+      return;
+    }
+    if (/(estado|status)/.test(normalized)) {
+      agentStatus();
+      return;
+    }
+    if (/(audit|audita|diagnost|revisa)/.test(normalized)) {
+      agentAudit();
+      return;
+    }
+    if (/(corrige|corregir|limpia|fix)/.test(normalized)) {
+      agentAudit();
+      return;
+    }
+    if (/(recomienda|recommend|sugiere)/.test(normalized)) {
+      agentRecommend();
+      return;
+    }
+    if (/(guia|guide)/.test(normalized)) {
+      agentGuide();
+      return;
+    }
+    if (/(ayuda|help)/.test(normalized)) {
+      agentHelp();
+      return;
+    }
+    if (/(barra|bar\b)/.test(normalized)) {
+      setChartType("bar");
+      agentSay("Switched to bar. Bar uses the first selected numeric series.");
+      return;
+    }
+    if (/(linea|line\b)/.test(normalized)) {
+      setChartType("line");
+      agentSay("Switched to line.");
+      return;
+    }
+    if (/(dona|donut|anillo)/.test(normalized)) {
+      setChartType("donut");
+      agentSay("Switched to donut. Donut uses the first selected numeric series.");
+      return;
+    }
+    if (/(pizza|pie|tarta)/.test(normalized)) {
+      setChartType("pie");
+      agentSay("Switched to pie. Pie uses the first selected numeric series.");
+      return;
+    }
+    if (/(csv)/.test(normalized)) {
+      downloadCSV();
+      agentSay("Downloaded the current table as pl-playground.csv.");
+      return;
+    }
+    agentSay("I did not recognize that command. Type help to see the local skills and commands.");
+  };
+
+  const agentRunSkill = async (name) => {
+    const labels = {
+      status: "Status",
+      audit: "Audit",
+      fix: "Fix data",
+      recommend: "Recommend",
+      guide: "Guide",
+      export: "Export",
+      help: "Help",
+    };
+    agentUser(labels[name] || name);
+    if (name === "status") agentStatus();
+    if (name === "audit") agentAudit();
+    if (name === "fix") agentFix();
+    if (name === "recommend") agentRecommend();
+    if (name === "guide") agentGuide();
+    if (name === "help") agentHelp();
+    if (name === "export") {
+      const menu = $("[data-pg-export-menu]");
+      if (menu) menu.open = true;
+      agentSay("Export menu opened. Choose PNG, JPG, WebP or PDF. The PNG/JPG/WebP files include the title and chart metadata.");
+    }
+  };
+
+  const agentGreeting = () => {
+    if (!table) {
+      agentSay("Ready. Load a table and I can read it, audit it, clean it and recommend a chart.");
+      return;
+    }
+    agentSay(
+      `I read ${table.rows.length} rows × ${table.columns.length} columns. Label: ${
+        labelIndex >= 0 ? table.columns[labelIndex] : "row number"
+      }. Try Status, Audit, Fix data, Recommend, or ask me to export a PNG/PDF.`
+    );
   };
 
   const loadSample = () => {
@@ -1015,7 +1732,10 @@
   };
 
   $$("[data-pg-tab]").forEach((button) => {
-    button.addEventListener("click", () => switchPane(button.dataset.pgTab));
+    button.addEventListener("click", () => {
+      switchPane(button.dataset.pgTab);
+      if (button.dataset.pgTab === "agent" && !els.agentLog.childElementCount) agentGreeting();
+    });
   });
 
   $$("[data-pg-chart]").forEach((button) => {
@@ -1067,7 +1787,35 @@
       if (action === "download") downloadCSV();
       if (action === "copy-command") copyCommand();
       if (action === "run-sql") runSQL(els.sqlQuery.value, els.sqlTable.value || "Query result", sqlSource);
+      if (action === "save") saveHistory();
+      if (action === "history") openHistory();
+      if (action === "clear-history") clearHistory();
     });
+  });
+
+  $$("[data-pg-export]").forEach((button) => {
+    button.addEventListener("click", () => exportImage(button.dataset.pgExport));
+  });
+
+  $$("[data-pg-history-close]").forEach((button) => {
+    button.addEventListener("click", closeHistory);
+  });
+
+  $$("[data-agent-skill]").forEach((button) => {
+    button.addEventListener("click", () => agentRunSkill(button.dataset.agentSkill));
+  });
+
+  els.agentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = els.agentInput.value.trim();
+    if (!text) return;
+    agentUser(text);
+    els.agentInput.value = "";
+    await agentCommand(text);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.historyModal && !els.historyModal.hidden) closeHistory();
   });
 
   els.file.addEventListener("change", () => {
@@ -1125,5 +1873,7 @@
     });
   }
 
+  savedPlots = readHistory();
+  updateHistoryCount();
   loadSample();
 })();

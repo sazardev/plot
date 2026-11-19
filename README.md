@@ -59,7 +59,7 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 - Localized messages and locale-aware number formatting.
 - A disposable SQLite cache with content-addressed keys, TTL, LRU eviction and user-only permissions.
 - Strict TOML configuration with flags > environment > config > default precedence.
-- A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with CSV download.
+- A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with PNG/JPG/WebP/PDF export, saved history and a local data agent.
 
 ## Documentation
 

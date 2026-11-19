@@ -31,7 +31,7 @@ rendering and configuration are plain Go packages outside the UI.
 | CI | GitHub Actions (`.github/workflows/ci.yml`) on every pull request and push to `main` | Runs the same quality gates as local |
 | Hooks | Lefthook (`lefthook.yml`): pre-commit format + lint, commit-msg Conventional Commits | Problems caught before they reach CI |
 | Updates | Renovate (`renovate.json`): grouped weekly updates | Dependencies stay current in small reviewable steps |
-| Web playground | Chart.js (MIT), SheetJS (Apache-2.0), sql.js (MIT), Geist fonts (OFL), vendored in `docs/assets/vendor` | Browser-only sandbox; never part of the Go binary |
+| Web playground | Chart.js (MIT), SheetJS (Apache-2.0), sql.js (MIT), jsPDF (MIT), Geist fonts (OFL), vendored in `docs/assets/vendor` | Browser-only sandbox with exports/history; never part of the Go binary |
 
 ## Project layout
 
@@ -52,7 +52,7 @@ db/queries/                       one .sql file per aggregate (cache queries)
 sqlc.yaml                         sqlite engine, schema, queries, output package
 testdata/                         sample inputs; render/TUI goldens live in internal/*/testdata
 docs/                             static product site and assets, served by GitHub Pages
-docs/assets/vendor/               browser-only Chart.js, SheetJS, sql.js and licenses
+docs/assets/vendor/               browser-only Chart.js, SheetJS, sql.js, jsPDF and licenses
 ```
 
 Dependency direction: `cmd → ui → render → domain` and `cmd → storage → domain`; `cmd → config` and
@@ -147,7 +147,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 
 - Charm libraries for the UI, `modernc.org/sqlite` for SQLite, `BurntSushi/toml` for config, go-i18n/x-text for localization, and the standard library for the rest.
 - Allowed: the table above. Anything else needs a reason in the PR.
-- The browser playground's Chart.js, SheetJS and sql.js are vendored under `docs/assets/vendor` with their licenses; they are not Go dependencies and must never be imported by `cmd/` or `internal/`.
+- The browser playground's Chart.js, SheetJS, sql.js and jsPDF are vendored under `docs/assets/vendor` with their licenses; they are not Go dependencies and must never be imported by `cmd/` or `internal/`.
 - Do NOT use: tview/termui/gocui alongside Bubble Tea (two UI models), `fmt.Print` while the program runs (corrupts the screen), global mutable state shared between components, goroutines that write to the model directly (send a message with `p.Send` or a command instead).
 
 ## Rules for agents
