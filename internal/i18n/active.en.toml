@@ -361,9 +361,17 @@ other = "could not load data"
 description = "Quit hint on an error screen."
 other = "press q to quit"
 
+["tui.row_one"]
+description = "One row in the TUI header."
+other = "1 row"
+
 ["tui.rows"]
 description = "Row count in the TUI header."
 other = "{{.Count}} rows"
+
+["tui.column_one"]
+description = "One column in the TUI header."
+other = "1 column"
 
 ["tui.columns"]
 description = "Column count in the TUI header."
@@ -372,6 +380,10 @@ other = "{{.Count}} columns"
 ["tui.series"]
 description = "Series count in the TUI header."
 other = "{{.Count}} series"
+
+["tui.warning_one"]
+description = "One warning in the TUI status line."
+other = "1 warning"
 
 ["tui.warnings"]
 description = "Warning count in the TUI status line."

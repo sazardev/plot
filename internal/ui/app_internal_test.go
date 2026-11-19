@@ -96,6 +96,7 @@ func assertTUIGolden(t *testing.T, path, got string) {
 func TestTUIAnimationRevealsMoreContent(t *testing.T) {
 	model := internalModel(t, 80, 24)
 	model.animating = true
+	model.animFrames = animationFrames
 	model.animFrame = 0
 	first := model.View()
 	model.animFrame = animationFrames
@@ -122,7 +123,7 @@ func TestTUIWarningsInStatusAndHelp(t *testing.T) {
 		view.warnings = []domain.Warning{{ID: "cli.warn.zero_slices", Data: map[string]string{"Count": "1"}}}
 		model.views[chartType] = view
 	}
-	require.Contains(t, model.View(), "1 warnings")
+	require.Contains(t, model.View(), "1 warning")
 	model.showHelp = true
 	model.help.ShowAll = true
 	require.Contains(t, model.View(), "zero-valued")

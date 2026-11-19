@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	minTUIWidth     = 40
-	minTUIHeight    = 20
-	maxContent      = 100
-	animationFrames = 12
-	animationDur    = 400 * time.Millisecond
+	minTUIWidth       = 40
+	minTUIHeight      = 20
+	maxContent        = 100
+	animationFrames   = 12
+	typeChangeFrames  = 4
+	animationInterval = 33 * time.Millisecond
 )
 
 // Options wires the TUI to the application layer without importing storage or
@@ -62,8 +63,9 @@ type Model struct {
 
 	showHelp bool
 
-	animFrame int
-	animating bool
+	animFrame  int
+	animFrames int
+	animating  bool
 }
 
 // New builds the TUI model.
@@ -112,6 +114,9 @@ func New(opts Options) Model {
 
 // Init starts loading and the spinner.
 func (m Model) Init() tea.Cmd {
+	if m.opts.NoMotion {
+		return m.loadCmd()
+	}
 	return tea.Batch(m.spinner.Tick, m.loadCmd())
 }
 
@@ -135,6 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showHelp = false
 		m.help.ShowAll = false
 		m.animFrame = 0
+		m.animFrames = animationFrames
 		m.animating = !m.opts.NoMotion
 		if m.animating {
 			return m, m.animationTick()
@@ -148,7 +154,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
-		if !m.loading {
+		if !m.loading || m.opts.NoMotion {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -160,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.animFrame++
-		if m.animFrame >= animationFrames {
+		if m.animFrame >= m.animFrames {
 			m.animating = false
 			return m, nil
 		}
@@ -206,6 +212,7 @@ func (m Model) cycle(delta int) (tea.Model, tea.Cmd) {
 	}
 	m.current = (m.current + delta + len(m.order)) % len(m.order)
 	m.animFrame = 0
+	m.animFrames = typeChangeFrames
 	m.animating = !m.opts.NoMotion
 	if m.animating {
 		return m, m.animationTick()
@@ -275,12 +282,11 @@ func (m Model) header() string {
 	}
 	if m.opts.Title != "" {
 		parts = append(parts, m.opts.Title)
-	} else {
-		parts = append(parts, string(view.spec.ChartType))
 	}
-	parts = append(parts, loc.T("tui.rows", map[string]any{"Count": len(view.spec.Labels)}))
+	parts = append(parts, string(view.spec.ChartType))
+	parts = append(parts, countLabel(loc, "tui.row_one", "tui.rows", len(view.spec.Labels)))
 	if m.dataset != nil {
-		parts = append(parts, loc.T("tui.columns", map[string]any{"Count": len(m.dataset.Columns)}))
+		parts = append(parts, countLabel(loc, "tui.column_one", "tui.columns", len(m.dataset.Columns)))
 	}
 	parts = append(parts, loc.T("tui.series", map[string]any{"Count": seriesCount(view.spec)}))
 	return strings.Join(parts, "  ")
@@ -301,6 +307,9 @@ func (m Model) status() string {
 	warnings := len(view.warnings)
 	if warnings == 0 {
 		return loc.T("tui.status_ready", nil)
+	}
+	if warnings == 1 {
+		return loc.T("tui.warning_one", nil)
 	}
 	return loc.T("tui.warnings", map[string]any{"Count": warnings})
 }
@@ -351,8 +360,8 @@ func (m Model) chart(width, height int) string {
 		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, m.styles.Error.Render(wrapText(text, width-4))), width, height)
 	}
 	lines := strings.Split(out, "\n")
-	if m.animating {
-		revealed := (len(lines)*m.animFrame + animationFrames - 1) / animationFrames
+	if m.animating && m.animFrames > 0 {
+		revealed := (len(lines)*m.animFrame + m.animFrames - 1) / m.animFrames
 		if revealed < 1 {
 			revealed = 1
 		}
@@ -394,8 +403,7 @@ func (m Model) sourceName() string {
 func (m Model) ExitCode() int { return m.exit }
 
 func (m Model) animationTick() tea.Cmd {
-	interval := animationDur / animationFrames
-	return tea.Tick(interval, func(time.Time) tea.Msg { return animationTickMsg{} })
+	return tea.Tick(animationInterval, func(time.Time) tea.Msg { return animationTickMsg{} })
 }
 
 func contentWidth(width int) int {
@@ -487,4 +495,11 @@ func keyMatches(msg tea.KeyMsg, binding interface{ Keys() []string }) bool {
 		}
 	}
 	return false
+}
+
+func countLabel(loc *i18n.Localizer, oneID, manyID string, count int) string {
+	if count == 1 {
+		return loc.T(oneID, nil)
+	}
+	return loc.T(manyID, map[string]any{"Count": count})
 }
