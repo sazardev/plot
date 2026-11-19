@@ -42,7 +42,7 @@ Read the code around a change before writing: `cmd/app` is the entry point, `int
 ```
 cmd/app/            entry point: flags, source selection, CLI pipeline, exit codes
 internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, inference); no Bubble Tea/Lip Gloss
-internal/storage/   delimited input parsing (stdin/CSV); SQLite and cache adapters arrive later
+internal/storage/   delimited input (stdin/CSV) and a read-only SQLite source; cache adapter later
 internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
 internal/ui/        styles.go theme; TUI root/screens/components arrive in milestone 4
 internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)
