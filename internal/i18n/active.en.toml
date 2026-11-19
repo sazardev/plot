@@ -20,7 +20,8 @@ other = "Input"
 description = "Input modes supported by the CLI."
 other = """  stdin is read when it is not a TTY and no file is given.
   Use '-' to read stdin explicitly; pass one or more matching files to concatenate them.
-  Use --db with --query/--query-file for a read-only SQLite query."""
+  Use --db with --query/--query-file for a read-only SQLite query.
+  Use --tui for the interactive view; it requires a file or database source."""
 
 ["cli.help.types_label"]
 description = "Label before supported chart types."
@@ -79,6 +80,14 @@ other = "sort rows: column[:asc|desc]; repeated or comma-separated"
 ["cli.flag.filter"]
 description = "Flag description for --filter."
 other = "filter rows: column<op>value; repeatable (AND)"
+
+["cli.flag.tui"]
+description = "Flag description for --tui."
+other = "open the interactive TUI (requires a terminal)"
+
+["cli.flag.no_motion"]
+description = "Flag description for --no-motion."
+other = "disable TUI animations"
 
 ["cli.flag.db"]
 description = "Flag description for --db."
@@ -208,6 +217,14 @@ other = "no plottable values"
 description = "An unexpected internal failure."
 other = "internal error: {{.Detail}}"
 
+["cli.warn.tui_fallback"]
+description = "The TUI cannot start because stdin or stdout is not a TTY."
+other = "TUI needs a terminal on stdin and stdout; using CLI mode"
+
+["cli.error.tui_size"]
+description = "Width or height was passed with --tui."
+other = "--tui uses the terminal size; do not pass --width or --height"
+
 ["cli.error.source_conflict"]
 description = "Database and positional file sources were combined."
 other = "use either a database source or file arguments, not both"
@@ -327,3 +344,83 @@ other = "{{.Rows}} categories exceed the bar limit; using row order (try --type 
 ["cli.warn.series_truncated"]
 description = "Only the first N series were plotted."
 other = "showing {{.Shown}} of {{.Total}} series"
+
+["tui.loading"]
+description = "Loading status in the TUI."
+other = "reading {{.Source}}..."
+
+["tui.loading_status"]
+description = "Status bar while loading."
+other = "loading..."
+
+["tui.could_not_load"]
+description = "TUI load error heading."
+other = "could not load data"
+
+["tui.press_quit"]
+description = "Quit hint on an error screen."
+other = "press q to quit"
+
+["tui.rows"]
+description = "Row count in the TUI header."
+other = "{{.Count}} rows"
+
+["tui.columns"]
+description = "Column count in the TUI header."
+other = "{{.Count}} columns"
+
+["tui.series"]
+description = "Series count in the TUI header."
+other = "{{.Count}} series"
+
+["tui.warnings"]
+description = "Warning count in the TUI status line."
+other = "{{.Count}} warnings"
+
+["tui.status_ready"]
+description = "Status line when the chart is ready."
+other = "ready"
+
+["tui.min_size"]
+description = "TUI minimum-size message."
+other = "terminal too small; need 40x20"
+
+["tui.chart_error"]
+description = "Chart rendering error in the TUI."
+other = "could not render chart: {{.Detail}}"
+
+["tui.key.quit"]
+description = "Quit key help."
+other = "quit"
+
+["tui.key.next"]
+description = "Next chart type key help."
+other = "next chart"
+
+["tui.key.prev"]
+description = "Previous chart type key help."
+other = "previous chart"
+
+["tui.key.help"]
+description = "Help key help."
+other = "help"
+
+["tui.key.close_help"]
+description = "Close help key help."
+other = "close help"
+
+["tui.key.up"]
+description = "Scroll up key help."
+other = "scroll up"
+
+["tui.key.down"]
+description = "Scroll down key help."
+other = "scroll down"
+
+["tui.key.left"]
+description = "Scroll left key help."
+other = "scroll left"
+
+["tui.key.right"]
+description = "Scroll right key help."
+other = "scroll right"

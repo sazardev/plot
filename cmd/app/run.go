@@ -73,38 +73,11 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 		return headerErr
 	}
 
-	ds, sourcePath, fromStdin, err := loadDataset(args, opts, stream, delimiter, headerMode)
-	if err != nil {
-		return asAppError(err, sourcePath, fromStdin)
-	}
-	if err := domain.Infer(ds); err != nil {
-		return asAppError(err, sourcePath, fromStdin)
-	}
-
 	ascii := resolveASCII(*opts, stream.Env)
 	glyphMode := domain.GlyphUnicode
 	if ascii {
 		glyphMode = domain.GlyphASCII
 	}
-
-	spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{
-		ChartType: opts.Type,
-		Label:     opts.Label,
-		Columns:   opts.Columns,
-		Renames:   opts.Renames,
-		Sorts:     opts.Sorts,
-		Filters:   opts.Filters,
-		Width:     width,
-		Height:    height,
-		Title:     opts.Title,
-		Locale:    resolveLocale(stream.Env),
-		ColorMode: colorMode,
-		GlyphMode: glyphMode,
-	})
-	if err != nil {
-		return asAppError(err, sourcePath, fromStdin)
-	}
-
 	profile := stream.Profile
 	if colorEnabled && (profile == termenv.Ascii || profile == 0 || !stream.OutTTY) {
 		profile = termenv.ANSI
@@ -114,6 +87,32 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 		ASCII:   ascii,
 		Profile: profile,
 	})
+
+	if opts.TUI && (opts.Width != 0 || opts.Height != 0) {
+		return usageError("cli.error.tui_size", nil)
+	}
+	if opts.TUI {
+		if !stream.InTTY || !stream.OutTTY {
+			if stream.Err != nil {
+				fmt.Fprintln(stream.Err, loc.T("cli.warn.tui_fallback", nil))
+			}
+		} else {
+			return runTUI(args, opts, stream, loc, delimiter, headerMode, colorMode, colorEnabled, glyphMode, theme)
+		}
+	}
+
+	ds, sourcePath, fromStdin, err := loadDataset(args, opts, stream, delimiter, headerMode)
+	if err != nil {
+		return asAppError(err, sourcePath, fromStdin)
+	}
+	if err := domain.Infer(ds); err != nil {
+		return asAppError(err, sourcePath, fromStdin)
+	}
+
+	spec, err := domain.BuildRenderSpec(ds, makeBuildOptions(opts, stream, colorMode, glyphMode, width, height))
+	if err != nil {
+		return asAppError(err, sourcePath, fromStdin)
+	}
 
 	frame, err := render.Chart(spec, theme)
 	if err != nil {
@@ -132,6 +131,23 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 		}
 	}
 	return nil
+}
+
+func makeBuildOptions(opts *cliOptions, stream appIO, colorMode domain.ColorMode, glyphMode domain.GlyphMode, width, height int) domain.BuildOptions {
+	return domain.BuildOptions{
+		ChartType: opts.Type,
+		Label:     opts.Label,
+		Columns:   opts.Columns,
+		Renames:   opts.Renames,
+		Sorts:     opts.Sorts,
+		Filters:   opts.Filters,
+		Width:     width,
+		Height:    height,
+		Title:     opts.Title,
+		Locale:    resolveLocale(stream.Env),
+		ColorMode: colorMode,
+		GlyphMode: glyphMode,
+	}
 }
 
 func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, header storage.HeaderMode) (*domain.Dataset, string, bool, error) {

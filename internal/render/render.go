@@ -187,8 +187,12 @@ func newRenderer(spec *domain.RenderSpec, theme Theme) (*renderer, error) {
 		width:  spec.Width,
 		height: spec.Height,
 	}
-	r.plotY = 1
-	r.plotH = r.height - 4 // title, x-axis, x labels, legend
+	titleRows := 0
+	if strings.TrimSpace(spec.Title) != "" {
+		titleRows = 1
+	}
+	r.plotY = titleRows
+	r.plotH = r.height - titleRows - 3 // x-axis, x labels, legend
 	if r.plotH < 1 {
 		return nil, &domain.TooSmallError{Width: spec.Width, Height: spec.Height}
 	}

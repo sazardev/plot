@@ -27,6 +27,8 @@ type cliOptions struct {
 	Color      string
 	ASCII      bool
 	Title      string
+	TUI        bool
+	NoMotion   bool
 	DB         string
 	Query      string
 	QueryFile  string
@@ -63,6 +65,8 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Flags().StringVar(&opts.Color, "color", "auto", loc.T("cli.flag.color", nil))
 	cmd.Flags().BoolVar(&opts.ASCII, "ascii", false, loc.T("cli.flag.ascii", nil))
 	cmd.Flags().StringVar(&opts.Title, "title", "", loc.T("cli.flag.title", nil))
+	cmd.Flags().BoolVar(&opts.TUI, "tui", false, loc.T("cli.flag.tui", nil))
+	cmd.Flags().BoolVar(&opts.NoMotion, "no-motion", false, loc.T("cli.flag.no_motion", nil))
 	cmd.Flags().StringVar(&opts.DB, "db", "", loc.T("cli.flag.db", nil))
 	cmd.Flags().StringVar(&opts.Query, "query", "", loc.T("cli.flag.query", nil))
 	cmd.Flags().StringVar(&opts.QueryFile, "query-file", "", loc.T("cli.flag.query_file", nil))

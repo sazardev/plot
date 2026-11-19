@@ -740,3 +740,55 @@ func TestRunExplicitDatabaseQueryConflictsWithFile(t *testing.T) {
 	assert.Equal(t, exitUsage, code)
 	assert.Contains(t, errOut.String(), "either a database source or file")
 }
+
+func TestRunTUIFallsBackWhenNotATTY(t *testing.T) {
+	t.Parallel()
+
+	stream, out, errOut := testIO("month,revenue\nJan,10\nFeb,20\n", false, false)
+	code := run([]string{"--tui"}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "Jan")
+	assert.Contains(t, errOut.String(), "TUI needs a terminal")
+}
+
+func TestRunTUIRejectsCLISizeFlags(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("", true, true)
+	code := run([]string{"--tui", "--width", "40"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "--tui uses the terminal size")
+}
+
+func TestRunTUIRequiresASource(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("", true, true)
+	code := run([]string{"--tui"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "no input")
+}
+
+func TestRunTUIRejectsStdinDash(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("", true, true)
+	code := run([]string{"--tui", "-"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "no input")
+}
+
+func TestRunHelpListsTUIFlags(t *testing.T) {
+	t.Parallel()
+
+	stream, out, _ := testIO("", true, true)
+	code := run([]string{"--help"}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "--tui")
+	assert.Contains(t, out.String(), "--no-motion")
+}

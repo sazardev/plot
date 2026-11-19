@@ -21,11 +21,12 @@ Read the code around a change before writing: `cmd/app` is the entry point, `int
 | Build the binary | `CGO_ENABLED=0 go build -o pl ./cmd/app` |
 | Run on a file | `go run ./cmd/app data.csv` |
 | Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/app` |
-| Run the TUI | `go run ./cmd/app --tui data.csv` (milestone 4, not implemented yet) |
+| Run the TUI | `go run ./cmd/app --tui data.csv` |
 | All tests | `go test ./...` |
 | Single test | `go test ./internal/domain -run TestInferClassifiesColumnsAndValues -v` |
 | Race detector | `go test -race ./...` |
 | Update render goldens | `go test ./internal/render -update` |
+| Update TUI goldens | `go test ./internal/ui -update-tui` |
 | Vet | `go vet ./...` |
 | Format | `gofmt -l -w .` |
 | Lint | `golangci-lint run` (v2) |
@@ -44,13 +45,14 @@ cmd/app/            entry point: flags, source selection, CLI pipeline, exit cod
 internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, inference); no Bubble Tea/Lip Gloss
 internal/storage/   delimited input (stdin/CSV) and a read-only SQLite source; cache adapter later
 internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
-internal/ui/        styles.go theme; TUI root/screens/components arrive in milestone 4
+internal/ui/        app.go root model, keys.go, styles.go, msgs.go, commands.go
+internal/ui/testdata/  TUI golden files (updated with -update-tui)
 internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)
 internal/testutil/  golden helper; builders and fakes arrive with more tests
 internal/db/        sqlc-generated cache code (future)
 db/migrations/      forward-only goose SQL migrations (future)
 db/queries/         one .sql file per aggregate (future)
-testdata/           sample inputs; render goldens live in internal/render/testdata
+testdata/           sample inputs; render and TUI goldens live in internal/*/testdata
 .github/workflows/  CI: lint, test, build (future)
 ```
 

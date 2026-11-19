@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/sazar/plot/internal/domain"
 )
@@ -32,11 +33,15 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 	}
 
 	percents := piePercentages(values)
+	titleRows := 0
+	if strings.TrimSpace(spec.Title) != "" {
+		titleRows = 1
+	}
 
 	labelWidth := 0
 	perLine := 0
 	lines := 0
-	maxLegendRows := spec.Height - 5
+	maxLegendRows := spec.Height - titleRows - 5
 	if maxLegendRows < 1 {
 		return "", pieSpaceError(spec)
 	}
@@ -51,7 +56,7 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 			candidatePerLine = 1
 		}
 		candidateLines := (len(spec.PieSlices) + candidatePerLine - 1) / candidatePerLine
-		if candidateLines <= maxLegendRows && spec.Height-1-candidateLines >= 5 {
+		if candidateLines <= maxLegendRows && spec.Height-titleRows-candidateLines >= 5 {
 			labelWidth = width
 			perLine = candidatePerLine
 			lines = candidateLines
@@ -62,7 +67,7 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 		return "", pieSpaceError(spec)
 	}
 
-	pieAreaHeight := spec.Height - 1 - lines
+	pieAreaHeight := spec.Height - titleRows - lines
 	if pieAreaHeight < 5 {
 		return "", pieSpaceError(spec)
 	}
@@ -78,7 +83,7 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 	}
 
 	centerX := spec.Width / 2
-	centerY := 1 + (pieAreaHeight-1)/2
+	centerY := titleRows + (pieAreaHeight-1)/2
 	canvas := newCanvas(spec.Width, spec.Height)
 
 	cumulative := make([]float64, len(values))
@@ -113,9 +118,11 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 		}
 	}
 
-	title := clip(spec.Title, spec.Width, theme.ASCII)
-	if title != "" {
-		canvas.rows[0].put(0, title, theme.Primary)
+	if titleRows > 0 {
+		title := clip(spec.Title, spec.Width, theme.ASCII)
+		if title != "" {
+			canvas.rows[0].put(0, title, theme.Primary)
+		}
 	}
 
 	legend := pieLegend(spec, theme, labelWidth, perLine, percents)
