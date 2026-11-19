@@ -40,6 +40,11 @@ type cliOptions struct {
 	CacheTTL   time.Duration
 	CacheMax   int64
 	Export     string
+	Bins       int
+	Grid       bool
+	NoLegend   bool
+	NoTitle    bool
+	NoMarkers  bool
 	changed    map[string]bool
 }
 
@@ -83,6 +88,11 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, loc.T("cli.flag.no_cache", nil))
 	cmd.Flags().StringVar(&opts.CacheDir, "cache-dir", "", loc.T("cli.flag.cache_dir", nil))
 	cmd.Flags().StringVar(&opts.Export, "export", "", loc.T("cli.flag.export", nil))
+	cmd.Flags().IntVar(&opts.Bins, "bins", 10, loc.T("cli.flag.bins", nil))
+	cmd.Flags().BoolVar(&opts.Grid, "grid", false, loc.T("cli.flag.grid", nil))
+	cmd.Flags().BoolVar(&opts.NoLegend, "no-legend", false, loc.T("cli.flag.no_legend", nil))
+	cmd.Flags().BoolVar(&opts.NoTitle, "no-title", false, loc.T("cli.flag.no_title", nil))
+	cmd.Flags().BoolVar(&opts.NoMarkers, "no-markers", false, loc.T("cli.flag.no_markers", nil))
 	cmd.Flags().StringVar(&opts.DB, "db", "", loc.T("cli.flag.db", nil))
 	cmd.Flags().StringVar(&opts.Query, "query", "", loc.T("cli.flag.query", nil))
 	cmd.Flags().StringVar(&opts.QueryFile, "query-file", "", loc.T("cli.flag.query_file", nil))

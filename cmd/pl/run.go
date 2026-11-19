@@ -83,6 +83,9 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 			defer func() { _ = cache.Close() }()
 		}
 	}
+	if opts.Bins < 1 || opts.Bins > 50 {
+		return usageError("cli.error.invalid_bins", nil)
+	}
 	if opts.LabelSet && strings.TrimSpace(opts.Label) == "" {
 		return usageError("cli.error.label_empty", nil)
 	}
@@ -209,18 +212,23 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 
 func makeBuildOptions(opts *cliOptions, stream appIO, colorMode domain.ColorMode, glyphMode domain.GlyphMode, width, height int) domain.BuildOptions {
 	return domain.BuildOptions{
-		ChartType: opts.Type,
-		Label:     opts.Label,
-		Columns:   opts.Columns,
-		Renames:   opts.Renames,
-		Sorts:     opts.Sorts,
-		Filters:   opts.Filters,
-		Width:     width,
-		Height:    height,
-		Title:     opts.Title,
-		Locale:    resolveLocale(stream.Env),
-		ColorMode: colorMode,
-		GlyphMode: glyphMode,
+		ChartType:   opts.Type,
+		Label:       opts.Label,
+		Columns:     opts.Columns,
+		Renames:     opts.Renames,
+		Sorts:       opts.Sorts,
+		Filters:     opts.Filters,
+		Width:       width,
+		Height:      height,
+		Title:       opts.Title,
+		Locale:      resolveLocale(stream.Env),
+		ColorMode:   colorMode,
+		GlyphMode:   glyphMode,
+		Bins:        opts.Bins,
+		Grid:        opts.Grid,
+		HideLegend:  opts.NoLegend,
+		HideTitle:   opts.NoTitle,
+		HideMarkers: opts.NoMarkers,
 	}
 }
 

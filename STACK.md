@@ -3,7 +3,7 @@
 ## Summary
 
 `pl` is a CLI-first terminal data plotter in Go: it reads delimited text from stdin or files, or runs a read-only
-SQLite query, infers columns and renders line, bar, pie and donut charts as terminal characters. The default path
+SQLite query, infers columns and renders line, area, scatter, histogram, bar, pie and donut charts as terminal characters. The default path
 is pipe-friendly and has no TUI dependency at runtime. `--tui` opts into a Bubble Tea view, which follows the Elm
 architecture: a `Model` holds state, `Update` turns messages into a new model plus commands, `View` renders a string.
 Side effects (IO, timers, cache writes) run only inside `tea.Cmd`s and come back as messages. Domain, parsing,

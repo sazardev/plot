@@ -24,6 +24,7 @@ pl example workspace
  13  export      Native PNG, JPG and PDF export
  14  web         Files for the browser playground
  15  all         Run the main chart scenarios
+ 16  charts      Area, scatter and histogram
   q  quit
 
 Usage: ./examples/run.sh <number|name>
@@ -199,6 +200,15 @@ EOF
     "$0" line
     "$0" donut
     "$0" sqlite
+    ;;
+  16|charts)
+    ensure_bin
+    heading "Area chart · revenue"
+    "$BIN" "$EXAMPLES/revenue.csv" --type area --title "Revenue area"
+    heading "Scatter · traffic sources"
+    "$BIN" "$EXAMPLES/traffic.csv" --type scatter --grid --title "Traffic scatter"
+    heading "Histogram · revenue distribution"
+    "$BIN" "$EXAMPLES/revenue.csv" --type histogram --bins 6 --title "Revenue distribution"
     ;;
   q|quit|exit)
     exit 0

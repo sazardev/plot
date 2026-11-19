@@ -314,7 +314,7 @@ func TestBuildRenderSpecRejectsUnknownChartType(t *testing.T) {
 	)
 	require.NoError(t, domain.Infer(ds))
 
-	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "scatter", Width: 80, Height: 24})
+	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "candle", Width: 80, Height: 24})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrUsage)
 }
@@ -367,4 +367,76 @@ func TestInferIsIdempotent(t *testing.T) {
 	}
 	require.NoError(t, domain.Infer(ds))
 	assert.Equal(t, first, ds.Rows)
+}
+
+func TestBuildRenderSpecSupportsAreaAndScatter(t *testing.T) {
+	t.Parallel()
+
+	for _, chartType := range []domain.ChartType{domain.ChartArea, domain.ChartScatter} {
+		ds := dataset(
+			[]string{"x", "y", "z"},
+			[]string{"1", "10", "4"},
+			[]string{"2", "20", "8"},
+			[]string{"3", "15", "6"},
+		)
+		require.NoError(t, domain.Infer(ds))
+		spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{
+			ChartType: string(chartType),
+			Width:     80,
+			Height:    24,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, chartType, spec.ChartType)
+		assert.Len(t, spec.Series, 2)
+	}
+}
+
+func TestBuildRenderSpecHistogram(t *testing.T) {
+	t.Parallel()
+
+	ds := dataset(
+		[]string{"value"},
+		[]string{"1"},
+		[]string{"2"},
+		[]string{"8"},
+		[]string{"9"},
+		[]string{"10"},
+	)
+	require.NoError(t, domain.Infer(ds))
+	spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{
+		ChartType: "histogram",
+		Bins:      4,
+		Width:     80,
+		Height:    24,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ChartHistogram, spec.ChartType)
+	assert.Len(t, spec.Labels, 4)
+	require.Len(t, spec.Series, 1)
+	assert.Len(t, spec.Series[0].Points, 4)
+	assert.Equal(t, "bins", spec.LabelName)
+}
+
+func TestBuildRenderSpecCustomization(t *testing.T) {
+	t.Parallel()
+
+	ds := dataset(
+		[]string{"month", "revenue"},
+		[]string{"Jan", "10"},
+		[]string{"Feb", "20"},
+	)
+	require.NoError(t, domain.Infer(ds))
+	spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{
+		Width:       80,
+		Height:      24,
+		Grid:        true,
+		HideLegend:  true,
+		HideTitle:   true,
+		HideMarkers: true,
+	})
+	require.NoError(t, err)
+	assert.True(t, spec.Grid)
+	assert.True(t, spec.HideLegend)
+	assert.True(t, spec.HideTitle)
+	assert.True(t, spec.HideMarkers)
 }

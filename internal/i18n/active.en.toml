@@ -29,7 +29,8 @@ other = "Chart types"
 
 ["cli.help.types"]
 description = "Supported chart types and the default rule."
-other = """  line, bar, pie, donut; aliases: plot (line), graph (bar)
+other = """  line, area, scatter, histogram, bar, pie, donut
+  aliases: plot (line), graph (bar), filled (area), points/dot (scatter), hist (histogram)
   Default: bar for one categorical series with at most 30 rows, otherwise line.
   Pie/donut need exactly one non-negative series with 2-12 unique slices."""
 
@@ -47,7 +48,9 @@ other = """  printf 'day,signups\\nMon,3\\nTue,5\\n' | pl
   pl sales.csv
   pl sales.csv --columns revenue --sort revenue:desc --filter 'revenue>=1000'
   pl --db metrics.db --query 'select day, signups from metrics'
-  pl sales.csv --type bar --title 'Revenue'"""
+  pl sales.csv --type bar --title 'Revenue'
+  pl sales.csv --type area --grid
+  pl revenue.csv --type histogram --bins 12"""
 
 ["cli.help.exit_label"]
 description = "Label before the exit-code summary."
@@ -59,7 +62,7 @@ other = "  0 success; 1 data/environment error; 2 usage error; 3 source error; 1
 
 ["cli.flag.type"]
 description = "Flag description for --type."
-other = "chart type: line, bar, pie or donut (aliases plot, graph)"
+other = "chart type: line, area, scatter, histogram, bar, pie or donut (aliases plot, graph, filled, points/dot, hist)"
 
 ["cli.flag.label"]
 description = "Flag description for --label."
@@ -88,6 +91,26 @@ other = "disable the parsed-dataset cache"
 ["cli.flag.cache_dir"]
 description = "Flag description for --cache-dir."
 other = "cache directory"
+
+["cli.flag.bins"]
+description = "Flag description for --bins."
+other = "histogram bin count (1-50)"
+
+["cli.flag.grid"]
+description = "Flag description for --grid."
+other = "draw a faint horizontal grid"
+
+["cli.flag.no_legend"]
+description = "Flag description for --no-legend."
+other = "hide the series legend"
+
+["cli.flag.no_title"]
+description = "Flag description for --no-title."
+other = "hide the chart title"
+
+["cli.flag.no_markers"]
+description = "Flag description for --no-markers."
+other = "hide line and area point markers"
 
 ["cli.flag.export"]
 description = "Flag description for --export."
@@ -211,7 +234,7 @@ other = "run 'pl --help' for usage"
 
 ["cli.error.unsupported_chart"]
 description = "A valid chart type is not implemented yet."
-other = "chart type {{.Type}} is not implemented yet; use line, bar, pie or donut"
+other = "chart type {{.Type}} is not implemented yet; use line, area, scatter, histogram, bar, pie or donut"
 
 ["cli.error.incompatible_chart"]
 description = "A chart type cannot render the selected data."
@@ -244,6 +267,10 @@ other = "--tui uses the terminal size; do not pass --width or --height"
 ["cli.error.panic"]
 description = "A recovered internal panic was printed as one line."
 other = "internal error; rerun with DEBUG=1 to write details to the debug log"
+
+["cli.error.invalid_bins"]
+description = "The histogram bin count is outside the accepted range."
+other = "--bins must be between 1 and 50"
 
 ["cli.error.export_format"]
 description = "The --export path has an unsupported extension."
@@ -339,7 +366,7 @@ other = "invalid color mode {{.Value}}; use auto, always or never"
 
 ["cli.error.invalid_type"]
 description = "The chart type value is invalid."
-other = "invalid chart type {{.Value}}; use line, bar, pie, donut, plot or graph"
+other = "invalid chart type {{.Value}}; use line, area, scatter, histogram, bar, pie, donut, plot or graph"
 
 ["cli.error.width"]
 description = "The width flag is out of range."

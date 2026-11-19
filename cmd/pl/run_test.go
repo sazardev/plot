@@ -173,7 +173,7 @@ func TestRunInvalidFlags(t *testing.T) {
 		{name: "color", args: []string{"--color", "rainbow"}, want: "invalid color mode"},
 		{name: "delimiter", args: []string{"--delimiter", ";;"}, want: "invalid delimiter"},
 		{name: "header conflict", args: []string{"--header", "--no-header"}, want: "use only one"},
-		{name: "unknown type", args: []string{"--type", "scatter"}, want: "unknown chart type"},
+		{name: "unknown type", args: []string{"--type", "candle"}, want: "unknown chart type"},
 		{name: "pie needs slices", args: []string{"--type", "pie"}, want: "at least two non-zero slices"},
 	}
 	for _, tt := range tests {
@@ -433,7 +433,7 @@ func TestRunHelpListsTransformFlags(t *testing.T) {
 	code := run([]string{"--help"}, stream)
 
 	require.Equal(t, 0, code)
-	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter", "--db", "--query", "--timeout", "--tui", "--no-motion", "--no-cache", "--cache-dir", "--config"} {
+	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter", "--db", "--query", "--timeout", "--tui", "--no-motion", "--no-cache", "--cache-dir", "--config", "--export", "--bins", "--grid", "--no-legend", "--no-title", "--no-markers"} {
 		assert.Contains(t, out.String(), flag)
 	}
 }
@@ -1209,4 +1209,34 @@ func TestRunExportAndTUIConflict(t *testing.T) {
 
 	assert.Equal(t, exitUsage, code)
 	assert.Contains(t, errOut.String(), "press e inside the TUI")
+}
+
+func TestRunNewChartTypesAndCustomization(t *testing.T) {
+	t.Parallel()
+
+	input := "month,revenue\nJan,10\nFeb,20\nMar,15\nApr,30\n"
+	for _, chartType := range []string{"area", "scatter", "histogram"} {
+		stream, out, errOut := testIO(input, false, false)
+		code := run([]string{"--type", chartType, "--bins", "3"}, stream)
+		require.Equal(t, 0, code, chartType)
+		assert.Empty(t, errOut.String())
+		assert.Contains(t, out.String(), "— "+chartType)
+	}
+
+	stream, out, errOut := testIO(input, false, false)
+	code := run([]string{"--type", "histogram", "--bins", "3", "--grid", "--no-title", "--no-legend"}, stream)
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.NotContains(t, out.String(), "stdin — histogram")
+	assert.NotContains(t, out.String(), "● revenue")
+	assert.Contains(t, out.String(), "·")
+}
+
+func TestRunRejectsInvalidBins(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("month,revenue\nJan,10\n", false, false)
+	code := run([]string{"--bins", "0"}, stream)
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "--bins must be between 1 and 50")
 }

@@ -34,37 +34,39 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 
 	percents := piePercentages(values)
 	titleRows := 0
-	if strings.TrimSpace(spec.Title) != "" {
+	if !spec.HideTitle && strings.TrimSpace(spec.Title) != "" {
 		titleRows = 1
 	}
 
 	labelWidth := 0
 	perLine := 0
 	lines := 0
-	maxLegendRows := spec.Height - titleRows - 5
-	if maxLegendRows < 1 {
-		return "", pieSpaceError(spec)
-	}
-	maxLabelWidth := 14
-	if spec.Width-11 < maxLabelWidth {
-		maxLabelWidth = spec.Width - 11
-	}
-	for width := maxLabelWidth; width >= 1; width-- {
-		entryWidth := width + 11
-		candidatePerLine := spec.Width / entryWidth
-		if candidatePerLine < 1 {
-			candidatePerLine = 1
+	if !spec.HideLegend {
+		maxLegendRows := spec.Height - titleRows - 5
+		if maxLegendRows < 1 {
+			return "", pieSpaceError(spec)
 		}
-		candidateLines := (len(spec.PieSlices) + candidatePerLine - 1) / candidatePerLine
-		if candidateLines <= maxLegendRows && spec.Height-titleRows-candidateLines >= 5 {
-			labelWidth = width
-			perLine = candidatePerLine
-			lines = candidateLines
-			break
+		maxLabelWidth := 14
+		if spec.Width-11 < maxLabelWidth {
+			maxLabelWidth = spec.Width - 11
 		}
-	}
-	if labelWidth == 0 {
-		return "", pieSpaceError(spec)
+		for width := maxLabelWidth; width >= 1; width-- {
+			entryWidth := width + 11
+			candidatePerLine := spec.Width / entryWidth
+			if candidatePerLine < 1 {
+				candidatePerLine = 1
+			}
+			candidateLines := (len(spec.PieSlices) + candidatePerLine - 1) / candidatePerLine
+			if candidateLines <= maxLegendRows && spec.Height-titleRows-candidateLines >= 5 {
+				labelWidth = width
+				perLine = candidatePerLine
+				lines = candidateLines
+				break
+			}
+		}
+		if labelWidth == 0 {
+			return "", pieSpaceError(spec)
+		}
 	}
 
 	pieAreaHeight := spec.Height - titleRows - lines
@@ -125,9 +127,11 @@ func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
 		}
 	}
 
-	legend := pieLegend(spec, theme, labelWidth, perLine, percents)
-	for i, row := range legend {
-		canvas.rows[spec.Height-len(legend)+i] = row
+	if !spec.HideLegend {
+		legend := pieLegend(spec, theme, labelWidth, perLine, percents)
+		for i, row := range legend {
+			canvas.rows[spec.Height-len(legend)+i] = row
+		}
 	}
 
 	return canvas.string(), nil

@@ -44,7 +44,13 @@ func Chart(spec *domain.RenderSpec, theme Theme) (string, error) {
 		if err := r.renderLine(); err != nil {
 			return "", err
 		}
-	case domain.ChartBar:
+	case domain.ChartArea:
+		if err := r.renderArea(); err != nil {
+			return "", err
+		}
+	case domain.ChartScatter:
+		r.renderScatter()
+	case domain.ChartBar, domain.ChartHistogram:
 		if err := r.renderBar(); err != nil {
 			return "", err
 		}
@@ -190,11 +196,15 @@ func newRenderer(spec *domain.RenderSpec, theme Theme) (*renderer, error) {
 		decimalSep: decimalSeparator(spec.Locale),
 	}
 	titleRows := 0
-	if strings.TrimSpace(spec.Title) != "" {
+	if !spec.HideTitle && strings.TrimSpace(spec.Title) != "" {
 		titleRows = 1
 	}
+	reservedRows := 3 // x-axis, x labels, legend
+	if spec.HideLegend {
+		reservedRows = 2 // x-axis and x labels
+	}
 	r.plotY = titleRows
-	r.plotH = r.height - titleRows - 3 // x-axis, x labels, legend
+	r.plotH = r.height - titleRows - reservedRows
 	if r.plotH < 1 {
 		return nil, &domain.TooSmallError{Width: spec.Width, Height: spec.Height}
 	}
@@ -244,7 +254,7 @@ func valueRange(spec *domain.RenderSpec) (float64, float64, error) {
 		return 0, 0, domain.ErrNoValues
 	}
 
-	if spec.ChartType == domain.ChartBar {
+	if spec.ChartType == domain.ChartBar || spec.ChartType == domain.ChartHistogram || spec.ChartType == domain.ChartArea {
 		if min > 0 {
 			min = 0
 		}
@@ -313,6 +323,10 @@ func xRange(spec *domain.RenderSpec) (float64, float64) {
 }
 
 func (r *renderer) buildYTicks() {
+	if r.spec.ChartType == domain.ChartHistogram {
+		r.buildHistogramYTicks()
+		return
+	}
 	count := 5
 	if r.plotH < count {
 		count = r.plotH
@@ -342,8 +356,38 @@ func (r *renderer) buildYTicks() {
 	}
 }
 
+func (r *renderer) buildHistogramYTicks() {
+	top := int(math.Ceil(r.yMax))
+	if top < 1 {
+		top = 1
+	}
+	count := 5
+	if top+1 < count {
+		count = top + 1
+	}
+	r.yTicks = make([]yTick, 0, count)
+	for i := 0; i < count; i++ {
+		value := 0.0
+		if count > 1 {
+			value = math.Round(float64(i) * float64(top) / float64(count-1))
+		}
+		r.yTicks = append(r.yTicks, yTick{
+			row:   r.yToRow(value),
+			value: value,
+			label: formatAxis(value, r.theme.ASCII, r.decimalSep),
+		})
+	}
+}
+
 func (r *renderer) drawAxes() {
 	vertical, horizontal, corner, tickGlyph, _ := r.theme.axisGlyphs()
+	if r.spec.Grid {
+		for _, tick := range r.yTicks {
+			for x := r.plotX; x < r.width; x++ {
+				r.canvas.set(x, tick.row, r.theme.gridGlyph(), r.theme.Muted)
+			}
+		}
+	}
 	for y := r.plotY; y < r.plotY+r.plotH; y++ {
 		r.canvas.set(r.yAxisW, y, vertical, r.theme.Muted)
 	}
@@ -430,7 +474,83 @@ func (r *renderer) renderLineBraille() error {
 	return nil
 }
 
+func (r *renderer) renderArea() error {
+	baseline := r.yToRow(0)
+	if r.yMin > 0 {
+		baseline = r.plotY + r.plotH - 1
+	}
+	if r.yMax < 0 {
+		baseline = r.plotY
+	}
+	for _, series := range r.spec.Series {
+		style := r.theme.seriesStyle(series.ColorSlot)
+		previous := domain.Point{}
+		hasPrevious := false
+		for _, point := range series.Points {
+			if point.Null {
+				hasPrevious = false
+				continue
+			}
+			x := r.xToCol(point.X)
+			y := r.yToRow(point.Y)
+			if hasPrevious {
+				prevX := r.xToCol(previous.X)
+				prevY := r.yToRow(previous.Y)
+				r.fillAreaSegment(prevX, prevY, x, y, baseline, style)
+			} else {
+				r.fillAreaColumn(x, y, baseline, style)
+			}
+			previous = point
+			hasPrevious = true
+		}
+	}
+	return r.renderLine()
+}
+
+func (r *renderer) fillAreaSegment(x0, y0, x1, y1, baseline int, style StyleFunc) {
+	if x1 == x0 {
+		r.fillAreaColumn(x1, y1, baseline, style)
+		return
+	}
+	step := 1
+	if x0 > x1 {
+		step = -1
+	}
+	length := abs(x1 - x0)
+	for offset := 0; offset <= length; offset++ {
+		x := x0 + offset*step
+		fraction := float64(offset) / float64(length)
+		y := int(math.Round(float64(y0) + fraction*float64(y1-y0)))
+		r.fillAreaColumn(x, y, baseline, style)
+	}
+}
+
+func (r *renderer) fillAreaColumn(x, y, baseline int, style StyleFunc) {
+	top, bottom := y, baseline
+	if top > bottom {
+		top, bottom = bottom, top
+	}
+	for row := top; row <= bottom; row++ {
+		r.canvas.set(x, row, r.theme.areaGlyph(), style)
+	}
+}
+
+func (r *renderer) renderScatter() {
+	for _, series := range r.spec.Series {
+		style := r.theme.seriesStyle(series.ColorSlot)
+		for _, point := range series.Points {
+			if point.Null {
+				continue
+			}
+			r.canvas.set(r.xToCol(point.X), r.yToRow(point.Y), r.theme.marker(series.Marker), style)
+		}
+	}
+}
+
 func (r *renderer) drawLineMarkers() {
+	if r.spec.HideMarkers {
+		return
+	}
 	for _, series := range r.spec.Series {
 		style := r.theme.seriesStyle(series.ColorSlot)
 		step := 1
@@ -642,7 +762,7 @@ func (r *renderer) drawXLabels() {
 			}
 			width := runewidth.StringWidth(label)
 			var center int
-			if r.spec.ChartType == domain.ChartBar {
+			if r.spec.ChartType == domain.ChartBar || r.spec.ChartType == domain.ChartHistogram {
 				center = r.barCenter(i)
 			} else if len(labels) == 1 {
 				center = r.plotX + r.plotW/2
@@ -710,6 +830,9 @@ func (r *renderer) nearestTimeLabel(value float64) string {
 }
 
 func (r *renderer) drawTitle() {
+	if r.spec.HideTitle {
+		return
+	}
 	title := clip(r.spec.Title, r.width, r.theme.ASCII)
 	if strings.TrimSpace(title) == "" {
 		return
@@ -718,6 +841,9 @@ func (r *renderer) drawTitle() {
 }
 
 func (r *renderer) drawLegend() {
+	if r.spec.HideLegend {
+		return
+	}
 	x := 0
 	for i, series := range r.spec.Series {
 		marker := r.theme.marker(series.Marker)

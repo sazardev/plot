@@ -2,7 +2,7 @@
 
 **Beautiful charts in your terminal.**
 
-`pl` turns pipes, CSVs and SQLite queries into line, bar, pie and donut charts in milliseconds.
+`pl` turns pipes, CSVs and SQLite queries into line, area, scatter, histogram, bar, pie and donut charts in milliseconds.
 It is a single static Go binary with an optional Bubble Tea TUI, a local parsed-dataset cache and no network access.
 
 [Website](https://sazardev.github.io/plot/) · [Playground](https://sazardev.github.io/plot/#playground) · [Usage guide](https://sazardev.github.io/plot/#docs) · [Issues](https://github.com/sazardev/plot/issues)
@@ -44,6 +44,11 @@ pl --db metrics.db --query 'select day, signups from metrics order by day'
 pl sales.csv --export chart.png
 pl sales.csv --export chart.pdf
 
+# area, scatter and histogram
+pl sales.csv --type area --grid
+pl traffic.csv --type scatter
+pl revenue.csv --type histogram --bins 12
+
 # interactive TUI; press e to export
 pl --tui sales.csv
 ```
@@ -53,8 +58,10 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 
 ## What it does
 
-- Line charts with braille subcells, up to 8 series, markers and gaps for nulls.
+- Line and area charts with braille subcells, up to 8 series, markers and gaps for nulls.
+- Scatter plots for numeric or categorical x axes, and histograms with configurable bins.
 - Bar charts with positive and negative values, sampled labels and stable guards.
+- Light customization: `--grid`, `--no-legend`, `--no-title`, `--no-markers`, and histogram `--bins`.
 - Pie and donut charts with largest-remainder percentages and a legend.
 - Delimiter and header detection, multiple files, column selection, renames, sorting and filtering.
 - Read-only SQLite input with query timeouts and verbatim driver errors.

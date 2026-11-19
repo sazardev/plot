@@ -242,11 +242,12 @@ without changing the source data.
 - Given sort and filter are both supplied, when run, then filtering is applied before sorting.
 - Given invalid filter syntax or a missing column, then it prints the grammar/available columns and exits `2`.
 
-**FR-9 — chart type selection.** The system must render line, bar, donut and pie, and pick a deterministic default
-when the type is not given.
+**FR-9 — chart type selection.** The system must render line, area, scatter, histogram, bar, donut and pie, and
+pick a deterministic default when the type is not given.
 
-- Canonical `--type` values: `line` (2D plot), `bar` (graph), `pie`, `donut`. Accepted aliases: `plot` → `line`,
-  `graph` → `bar`. Any other value is a usage error (`2`) listing the valid values.
+- Canonical `--type` values: `line` (2D plot), `area` (filled line), `scatter` (points), `histogram`, `bar`
+  (graph), `pie`, `donut`. Accepted aliases: `plot` → `line`, `graph` → `bar`, `filled` → `area`, `points`/`dot` →
+  `scatter`, `hist` → `histogram`. Any other value is a usage error (`2`) listing the valid values.
 - Default rule, documented in `--help`:
   - Exactly one value series, a categorical label, at most 30 rows and at most 30 distinct labels, and enough
     width for one bar per row → `bar`.
@@ -255,6 +256,9 @@ when the type is not given.
   - `pie` and `donut` are never auto-selected.
 - Compatibility matrix:
   - `line`: 1–8 series, any label type.
+  - `area`: 1–8 series, any label type; filled toward the zero baseline.
+  - `scatter`: 1–8 series, numeric, time or categorical x axis; markers only.
+  - `histogram`: exactly 1 numeric series; 1–50 bins (`--bins`, default 10); counts use a zero baseline.
   - `bar`: exactly 1 series; values may be negative (zero baseline); rows must fit the available width.
   - `pie`/`donut`: exactly 1 series, 2–12 non-null rows, unique labels, all finite and non-negative, total > 0.
     Zero-valued slices are dropped with a note; negative, NaN, infinite values or duplicate labels are rejected
@@ -439,7 +443,7 @@ with no wrapper (FR-4).
 | `Column` | `name`, `original_name`, `index`, `kind` (label/value), `value_type` (string/int/float/time/bool/empty/blob), `null_count`, `coerced_null_count`, `distinct_count` | `name` is unique after duplicate suffixing; `index` is 0-based internally, 1-based in flags. |
 | `Cell` | `kind` (null/number/time/text/bool/blob), `number`, `time`, `text` | Numeric cells do not retain their raw string. |
 | `Series` | `column`, `label`, `points[]`, `color_slot`, `marker` | One per plotted value column; `points` carry x (index/time) and y (number) with gaps for nulls. |
-| `RenderSpec` | `chart_type`, `label_column`, `series[]`, `sort`, `filter`, `width`, `height`, `title`, `color_mode`, `glyph_mode`, `locale`, `timezone` | Resolved after inference and overrides; the sole input to the renderer. |
+| `RenderSpec` | `chart_type`, `label_column`, `series[]`, `sort`, `filter`, `width`, `height`, `title`, `color_mode`, `glyph_mode`, `locale`, `timezone`, plus `grid`/`hide_*` | Resolved after inference and overrides; the sole input to the renderer. |
 | `CacheEntry` | `key`, `schema_version`, `source_kind`, `source_id`, `created_at`, `last_used_at`, `size_bytes`, `payload` | One SQLite row; `payload` is the encoded, versioned `Dataset`. |
 | `Warning` | `id`, `template_data` | Localized at the edge (CLI stderr or TUI status/help). |
 
@@ -494,7 +498,7 @@ pl --help | --version
 
 | Flag | Value | Default | Requirement |
 | --- | --- | --- | --- |
-| `--type` | `line`, `bar`, `pie`, `donut`; aliases `plot`, `graph` | auto (FR-9) | FR-9 |
+| `--type` | `line`, `area`, `scatter`, `histogram`, `bar`, `pie`, `donut`; aliases `plot`, `graph`, `filled`, `points`/`dot`, `hist` | auto (FR-9) | FR-9 |
 | `--label` | column name or 1-based position | inferred | FR-5, FR-6 |
 | `--columns` | list of names/positions; repeatable | all inferable value columns (max 8 for line) | FR-6 |
 | `--rename` | `old=new`; repeatable | none | FR-7 |
@@ -513,6 +517,11 @@ pl --help | --version
 | `--color` | `auto`, `always`, `never` | `auto` | FR-10 |
 | `--ascii` | boolean | auto-detect | NFR-6 |
 | `--no-motion` | boolean | `false` | FR-11 |
+| `--bins` | 1–50 | `10` | FR-9 |
+| `--grid` | boolean | `false` | FR-10 |
+| `--no-legend` | boolean | `false` | FR-10 |
+| `--no-title` | boolean | `false` | FR-10 |
+| `--no-markers` | boolean | `false` | FR-10 |
 | `--no-cache` | boolean | `false` | FR-13 |
 | `--cache-dir` | directory path | `os.UserCacheDir()/pl` | FR-13 |
 | `--export` | path ending in `.png`, `.jpg`, `.jpeg` or `.pdf` | none | FR-14 |
@@ -672,8 +681,14 @@ cycle with `internal/ui/styles.go`.
   two x-axis lines, and a legend of one or two lines. No outer border in CLI mode; data area is prioritized.
 - Line chart: braille subcells (2×4 per cell), 5 y ticks, sampled x labels, markers at sampled points for
   multi-series readability, gaps for nulls.
+- Area chart: the line chart plus a shaded fill (`░`, ASCII `:`) down to the zero baseline.
+- Scatter chart: one marker per non-null point, colored by series; numeric/time x ticks or categorical labels.
+- Histogram: one numeric series, 1–50 bins (`--bins`, default 10), counted into vertical bar-style bins with a zero
+  baseline.
 - Bar chart: vertical block-element bars from a zero baseline; positive bars up, negative bars down; one-cell gaps
   when width allows; sampled category labels; all-zero/constant data uses a stable mid-height guard.
+- Customization: `--grid` adds a faint horizontal grid, `--no-legend` hides the legend, `--no-title` hides the
+  title, and `--no-markers` hides line/area point markers. Hidden chrome gives its rows back to the plot.
 - Pie/donut: compensate for the ~2:1 terminal cell aspect ratio so the shape is roughly circular; segments are
   colored, separated by visible gaps/edges and also listed in the legend with localized percentages
   (largest-remainder rounding, one decimal); donut has a hollow center. No text on slices.
@@ -816,7 +831,7 @@ The previous draft's Q1–Q16 are resolved as follows. Later changes need a spec
 | 1 | No input (TTY stdin, no source) → usage on stderr, exit `2`; never read the terminal. |
 | 2 | Auto-detect comma, tab, semicolon and pipe; `--delimiter` overrides with a rune or name. JSON/JSONL are out; TSV is tab-delimited. |
 | 3 | v1 reads SQLite only, read-only, via `--db` + `--query`/`--query-file` or config/env. PostgreSQL/MySQL are served by piping `psql --csv` or `mysql --batch` output. |
-| 4 | Final flags are the table in §9.2; `--type` uses `line`/`bar`/`pie`/`donut` with `plot`/`graph` aliases. |
+| 4 | Final flags are the table in §9.2; `--type` uses line/area/scatter/histogram/bar/pie/donut with the documented aliases. |
 | 5 | Data-driven default: one series + categorical label (≤30 rows/labels that fit) → bar; otherwise line. Pie/donut are explicit only. |
 | 6 | Pie/donut accept exactly one series, 2–12 unique non-negative categories, total > 0; extra series are rejected with a suggestion, not summed. |
 | 7 | `--tui` without a TTY falls back to CLI with one stderr warning; it does not hard-error. |
@@ -827,7 +842,7 @@ The previous draft's Q1–Q16 are resolved as follows. Later changes need a spec
 | 12 | Exit codes are the table in §9.3: `0`, `1`, `2`, `3`, `130`, `141`; cache failures never change them. |
 | 13 | Ragged rows are padded/truncated and warned once; they do not abort the run. |
 | 14 | Filters are simple `column op value` expressions ANDed together, available for all sources; no SQL/OR/grouping. |
-| 15 | "Graph" means bar; v1 has four types: line, bar, pie, donut. |
+| 15 | "Graph" means bar; v1 has seven types: line, area, scatter, histogram, bar, pie, donut. |
 | 16 | Renames are display-only; `--columns`, `--label`, `--sort` and `--filter` always use original parsed names. |
 
 ## 14. Deferred

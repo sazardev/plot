@@ -25,6 +25,9 @@ var chartOrder = []domain.ChartType{
 	domain.ChartBar,
 	domain.ChartPie,
 	domain.ChartDonut,
+	domain.ChartArea,
+	domain.ChartScatter,
+	domain.ChartHistogram,
 }
 
 func (m Model) loadCmd() tea.Cmd {

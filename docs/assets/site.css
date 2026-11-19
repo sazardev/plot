@@ -729,6 +729,10 @@ button {
   grid-column: span 6;
 }
 
+.shot.third {
+  grid-column: span 4;
+}
+
 .shot-media {
   position: relative;
   padding: 0.6rem;
@@ -1265,7 +1269,8 @@ kbd {
 
   .shot,
   .shot.wide,
-  .shot.narrow {
+  .shot.narrow,
+  .shot.third {
     grid-column: auto;
   }
 

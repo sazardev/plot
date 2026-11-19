@@ -115,14 +115,17 @@ type Series struct {
 	Marker    int
 }
 
-// ChartType is one of the four supported chart families.
+// ChartType is one of the supported chart families.
 type ChartType string
 
 const (
-	ChartLine  ChartType = "line"
-	ChartBar   ChartType = "bar"
-	ChartPie   ChartType = "pie"
-	ChartDonut ChartType = "donut"
+	ChartLine      ChartType = "line"
+	ChartBar       ChartType = "bar"
+	ChartPie       ChartType = "pie"
+	ChartDonut     ChartType = "donut"
+	ChartArea      ChartType = "area"
+	ChartScatter   ChartType = "scatter"
+	ChartHistogram ChartType = "histogram"
 )
 
 // LabelKind describes the x-axis values.
@@ -175,21 +178,30 @@ type RenderSpec struct {
 	ColorMode   ColorMode
 	GlyphMode   GlyphMode
 	Locale      string
+	Grid        bool
+	HideLegend  bool
+	HideTitle   bool
+	HideMarkers bool
 }
 
 // BuildOptions are the user-controlled inputs to chart resolution.
 type BuildOptions struct {
-	ChartType string
-	Label     string
-	Columns   []string
-	Renames   []string
-	Sorts     []string
-	Filters   []string
-	Width     int
-	Height    int
-	Title     string
-	Locale    string
-	ColorMode ColorMode
-	GlyphMode GlyphMode
-	MaxSeries int
+	ChartType   string
+	Label       string
+	Columns     []string
+	Renames     []string
+	Sorts       []string
+	Filters     []string
+	Width       int
+	Height      int
+	Title       string
+	Locale      string
+	ColorMode   ColorMode
+	GlyphMode   GlyphMode
+	MaxSeries   int
+	Bins        int
+	Grid        bool
+	HideLegend  bool
+	HideTitle   bool
+	HideMarkers bool
 }

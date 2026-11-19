@@ -45,6 +45,7 @@ PL_BIN=/path/to/pl ./examples/run.sh line
 | 13 | `export` | Native PNG, JPG and PDF export, plus TUI export keys |
 | 14 | `web` | Paths and instructions for the browser playground |
 | 15 | `all` | Run the main chart scenarios back to back |
+| 16 | `charts` | Area, scatter and histogram examples |
 
 ## Files
 
@@ -80,9 +81,9 @@ examples/
 The `.db` and `.xlsx` files are committed fixtures. Regenerate the database with `sqlite3 metrics.db < ...`
 if you want to change it.
 
-`tab` only cycles chart types that fit the current data. `traffic.csv` has three series, so only `line` is
-compatible; use `channels.csv` (the `tui` scenario) to see bar, pie and donut as well. The TUI status bar tells
-you when only one chart fits.
+`tab` only cycles chart types that fit the current data. `traffic.csv` has three series, so line, area and
+scatter are compatible; use `channels.csv` (the `tui` scenario) to see bar, pie, donut and histogram as well.
+The TUI status bar tells you when only one chart fits.
 
 TUI colors use the terminal ANSI palette, so they follow the terminal/system scheme. Exported screenshots inherit
 that palette and the system monospace font; override with `PL_EXPORT_FONT` (file or fontconfig family) and
@@ -136,6 +137,9 @@ CGO_ENABLED=0 go build -o pl ./cmd/pl
 ./pl --tui examples/channels.csv
 
 # export the same rendered frame from the CLI
+./pl examples/revenue.csv --type area
+./pl examples/revenue.csv --type histogram --bins 6
+./pl examples/traffic.csv --type scatter --grid
 ./pl examples/revenue.csv --type bar --export chart.png
 ./pl examples/revenue.csv --type bar --export chart.pdf
 

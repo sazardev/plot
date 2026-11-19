@@ -350,3 +350,54 @@ func TestChartMultiSeriesBraille(t *testing.T) {
 	assert.Contains(t, out, "orders")
 	assert.True(t, containsBraille(out))
 }
+
+func TestChartAreaAndScatter(t *testing.T) {
+	t.Parallel()
+
+	area := lineSpec()
+	area.ChartType = domain.ChartArea
+	area.Title = "area"
+	out, err := render.Chart(area, render.Theme{})
+	require.NoError(t, err)
+	assert.Contains(t, out, "░")
+	assert.Contains(t, out, "area")
+
+	scatter := lineSpec()
+	scatter.ChartType = domain.ChartScatter
+	scatter.Title = "scatter"
+	out, err = render.Chart(scatter, render.Theme{})
+	require.NoError(t, err)
+	assert.Contains(t, out, "●")
+	assert.Contains(t, out, "scatter")
+}
+
+func TestChartHistogram(t *testing.T) {
+	t.Parallel()
+
+	spec := barSpec()
+	spec.ChartType = domain.ChartHistogram
+	spec.Labels = []string{"0-5", "5-10", "10-15"}
+	spec.Series = []domain.Series{{
+		Column: 1,
+		Label:  "revenue count",
+		Points: []domain.Point{{X: 0, Y: 3}, {X: 1, Y: 5}, {X: 2, Y: 2}},
+	}}
+	out, err := render.Chart(spec, render.Theme{})
+	require.NoError(t, err)
+	assert.Contains(t, out, "█")
+	assert.Contains(t, out, "0-5")
+}
+
+func TestChartCustomization(t *testing.T) {
+	t.Parallel()
+
+	spec := barSpec()
+	spec.Grid = true
+	spec.HideTitle = true
+	spec.HideLegend = true
+	out, err := render.Chart(spec, render.Theme{})
+	require.NoError(t, err)
+	assert.NotContains(t, out, "stdin — bar")
+	assert.NotContains(t, out, "● revenue")
+	assert.Contains(t, out, "·")
+}

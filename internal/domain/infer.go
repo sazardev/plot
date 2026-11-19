@@ -387,6 +387,14 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 	if err != nil {
 		return nil, err
 	}
+	if chartType == ChartHistogram {
+		labels, series, err = buildHistogram(series, opts.Bins, opts.GlyphMode)
+		if err != nil {
+			return nil, err
+		}
+		selection.labelKind = LabelCategorical
+		selection.labelName = "bins"
+	}
 	var pieSlices []PieSlice
 	if chartType == ChartPie || chartType == ChartDonut {
 		pieSlices, err = buildPieSlices(ds, series, labels, chartType)
@@ -426,6 +434,10 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 		ColorMode:   opts.ColorMode,
 		GlyphMode:   opts.GlyphMode,
 		Locale:      opts.Locale,
+		Grid:        opts.Grid,
+		HideLegend:  opts.HideLegend,
+		HideTitle:   opts.HideTitle,
+		HideMarkers: opts.HideMarkers,
 	}, nil
 }
 
@@ -439,6 +451,18 @@ func resolveChartType(requested string, series []Series, labelKind LabelKind, ro
 		return ChartLine, nil
 	case "line", "plot":
 		return ChartLine, nil
+	case "area", "filled":
+		return ChartArea, nil
+	case "scatter", "points", "dot":
+		return ChartScatter, nil
+	case "histogram", "hist":
+		if len(series) != 1 {
+			return "", &IncompatibleChartError{
+				Type:   ChartHistogram,
+				Reason: "histograms need exactly one value series",
+			}
+		}
+		return ChartHistogram, nil
 	case "bar", "graph":
 		if len(series) != 1 {
 			return "", &IncompatibleChartError{Type: ChartBar, Reason: "bar charts need exactly one value series"}
@@ -456,8 +480,80 @@ func resolveChartType(requested string, series []Series, labelKind LabelKind, ro
 		}
 		return ChartType(requested), nil
 	default:
-		return "", &UsageError{Detail: fmt.Sprintf("unknown chart type %q; use line, bar, pie or donut", requested)}
+		return "", &UsageError{Detail: fmt.Sprintf("unknown chart type %q; use line, bar, area, scatter, histogram, pie or donut", requested)}
 	}
+}
+
+func buildHistogram(series []Series, requestedBins int, glyphMode GlyphMode) ([]string, []Series, error) {
+	if len(series) != 1 {
+		return nil, nil, &IncompatibleChartError{
+			Type:   ChartHistogram,
+			Reason: "histograms need exactly one value series",
+		}
+	}
+	values := make([]float64, 0, len(series[0].Points))
+	for _, point := range series[0].Points {
+		if point.Null || math.IsNaN(point.Y) || math.IsInf(point.Y, 0) {
+			continue
+		}
+		values = append(values, point.Y)
+	}
+	if len(values) == 0 {
+		return nil, nil, ErrNoValues
+	}
+	bins := requestedBins
+	if bins <= 0 {
+		bins = 10
+	}
+	if bins > 50 {
+		bins = 50
+	}
+	min, max := values[0], values[0]
+	for _, value := range values[1:] {
+		min = math.Min(min, value)
+		max = math.Max(max, value)
+	}
+	if min == max {
+		bins = 1
+	}
+	counts := make([]int, bins)
+	for _, value := range values {
+		position := 0
+		if max > min {
+			position = int((value - min) / (max - min) * float64(bins))
+			if position >= bins {
+				position = bins - 1
+			}
+		}
+		counts[position]++
+	}
+	labels := make([]string, bins)
+	points := make([]Point, bins)
+	separator := "–"
+	if glyphMode == GlyphASCII {
+		separator = "-"
+	}
+	for index, count := range counts {
+		low := min
+		high := max
+		if bins > 1 {
+			low = min + (max-min)*float64(index)/float64(bins)
+			high = min + (max-min)*float64(index+1)/float64(bins)
+		}
+		labels[index] = formatHistogramNumber(low) + separator + formatHistogramNumber(high)
+		points[index] = Point{X: float64(index), Y: float64(count)}
+	}
+	histogram := series[0]
+	histogram.Points = points
+	histogram.Label = histogram.Label + " count"
+	return labels, []Series{histogram}, nil
+}
+
+func formatHistogramNumber(value float64) string {
+	if math.Trunc(value) == value && math.Abs(value) < 1e15 {
+		return strconv.FormatInt(int64(value), 10)
+	}
+	return strconv.FormatFloat(value, 'g', 4, 64)
 }
 
 func buildPieSlices(ds *Dataset, series []Series, labels []string, chartType ChartType) ([]PieSlice, error) {

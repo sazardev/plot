@@ -43,6 +43,20 @@ func (t Theme) lineGlyph() string {
 	return "·"
 }
 
+func (t Theme) areaGlyph() string {
+	if t.ASCII {
+		return ":"
+	}
+	return "░"
+}
+
+func (t Theme) gridGlyph() string {
+	if t.ASCII {
+		return "."
+	}
+	return "·"
+}
+
 func (t Theme) axisGlyphs() (vertical, horizontal, corner, tick, baseline string) {
 	if t.ASCII {
 		return "|", "-", "+", "+", "-"
