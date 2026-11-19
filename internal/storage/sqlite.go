@@ -58,7 +58,7 @@ func ReadSQLite(ctx context.Context, opts SQLiteOptions) (*domain.Dataset, error
 	if err != nil {
 		return nil, &domain.DatabaseError{Err: err}
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(1)
 
 	if err := db.PingContext(queryCtx); err != nil {
@@ -75,7 +75,7 @@ func ReadSQLite(ctx context.Context, opts SQLiteOptions) (*domain.Dataset, error
 	if err != nil {
 		return nil, databaseContextError(queryCtx, timeout, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	columnNames, err := rows.Columns()
 	if err != nil {

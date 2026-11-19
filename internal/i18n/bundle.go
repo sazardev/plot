@@ -4,10 +4,13 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
+	"strconv"
 
 	"github.com/BurntSushi/toml"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 //go:embed active.*.toml
@@ -15,7 +18,8 @@ var messageFiles embed.FS
 
 // Localizer localizes message IDs at the CLI/TUI edge.
 type Localizer struct {
-	loc *i18n.Localizer
+	loc     *i18n.Localizer
+	printer *message.Printer
 }
 
 // New loads the embedded message files and resolves tag. Invalid or unknown
@@ -37,7 +41,10 @@ func New(tag string) (*Localizer, error) {
 	if tag == "" {
 		tag = "en"
 	}
-	return &Localizer{loc: i18n.NewLocalizer(bundle, tag)}, nil
+	return &Localizer{
+		loc:     i18n.NewLocalizer(bundle, tag),
+		printer: message.NewPrinter(language.Make(tag)),
+	}, nil
 }
 
 // T returns the localized message. A missing ID returns the ID itself; it
@@ -51,7 +58,16 @@ func (l *Localizer) T(id string, data map[string]any) string {
 		TemplateData: data,
 	})
 	if err != nil || message == "" {
+		slog.Debug("missing i18n message", "id", id)
 		return id
 	}
 	return message
+}
+
+// FormatInt formats a count with the active locale's grouping.
+func (l *Localizer) FormatInt(value int) string {
+	if l == nil || l.printer == nil {
+		return strconv.Itoa(value)
+	}
+	return l.printer.Sprintf("%d", value)
 }

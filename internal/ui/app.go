@@ -38,6 +38,9 @@ type Options struct {
 	Title       string
 	NoMotion    bool
 	Color       bool
+	// OnLoaded runs after the first loaded frame is scheduled. The application
+	// uses it for best-effort cache writes, which must stay outside Update.
+	OnLoaded func() tea.Cmd
 }
 
 // Model is the single-screen plot view.
@@ -61,7 +64,8 @@ type Model struct {
 	order   []domain.ChartType
 	current int
 
-	showHelp bool
+	showHelp   bool
+	helpOffset int
 
 	animFrame  int
 	animFrames int
@@ -127,6 +131,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = contentWidth(m.width)
+		if m.showHelp && m.helpOffset > m.maxHelpOffset() {
+			m.helpOffset = m.maxHelpOffset()
+		}
 		return m, nil
 
 	case loadedMsg:
@@ -139,13 +146,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.current = indexOf(m.order, msg.initial)
 		m.showHelp = false
 		m.help.ShowAll = false
+		m.helpOffset = 0
 		m.animFrame = 0
 		m.animFrames = animationFrames
 		m.animating = !m.opts.NoMotion
+		var cmds []tea.Cmd
 		if m.animating {
-			return m, m.animationTick()
+			cmds = append(cmds, m.animationTick())
 		}
-		return m, nil
+		if m.opts.OnLoaded != nil {
+			if cmd := m.opts.OnLoaded(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
 
 	case loadErrMsg:
 		m.loading = false
@@ -189,18 +203,24 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyMatches(msg, m.keys.Help):
 		m.showHelp = !m.showHelp
 		m.help.ShowAll = m.showHelp
+		m.helpOffset = 0
 		return m, nil
 	case keyMatches(msg, m.keys.CloseHelp):
 		m.showHelp = false
 		m.help.ShowAll = false
+		m.helpOffset = 0
 		return m, nil
 	case keyMatches(msg, m.keys.Up):
+		if m.showHelp && m.helpOffset > 0 {
+			m.helpOffset--
+		}
 		return m, nil
 	case keyMatches(msg, m.keys.Down):
+		if m.showHelp && m.helpOffset < m.maxHelpOffset() {
+			m.helpOffset++
+		}
 		return m, nil
-	case keyMatches(msg, m.keys.Left):
-		return m, nil
-	case keyMatches(msg, m.keys.Right):
+	case keyMatches(msg, m.keys.Left), keyMatches(msg, m.keys.Right):
 		return m, nil
 	}
 	return m, nil
@@ -288,7 +308,11 @@ func (m Model) header() string {
 	if m.dataset != nil {
 		parts = append(parts, countLabel(loc, "tui.column_one", "tui.columns", len(m.dataset.Columns)))
 	}
-	parts = append(parts, loc.T("tui.series", map[string]any{"Count": seriesCount(view.spec)}))
+	series := seriesCount(view.spec)
+	parts = append(parts, loc.T("tui.series", map[string]any{
+		"Count":     series,
+		"CountText": loc.FormatInt(series),
+	}))
 	return strings.Join(parts, "  ")
 }
 
@@ -311,7 +335,10 @@ func (m Model) status() string {
 	if warnings == 1 {
 		return loc.T("tui.warning_one", nil)
 	}
-	return loc.T("tui.warnings", map[string]any{"Count": warnings})
+	return loc.T("tui.warnings", map[string]any{
+		"Count":     warnings,
+		"CountText": loc.FormatInt(warnings),
+	})
 }
 
 func (m Model) body(width, height int) string {
@@ -330,11 +357,7 @@ func (m Model) body(width, height int) string {
 		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, m.styles.Error.Render(text)), width, height)
 	}
 	if m.showHelp {
-		text := m.help.View(m.keys)
-		if warnings := m.warningText(); warnings != "" {
-			text += "\n\n" + warnings
-		}
-		return padBlock(text, width, height)
+		return padBlock(scrollLines(m.helpText(), m.helpOffset, height), width, height)
 	}
 	return m.chart(width, height)
 }
@@ -372,6 +395,40 @@ func (m Model) chart(width, height int) string {
 	return padBlock(strings.Join(lines, "\n"), width, height)
 }
 
+func (m Model) helpText() string {
+	text := m.help.View(m.keys)
+	if warnings := m.warningText(); warnings != "" {
+		text += "\n\n" + warnings
+	}
+	return text
+}
+
+// helpViewHeight mirrors the chart body height in View: total height minus
+// header, status, help bar and the rounded frame.
+func (m Model) helpViewHeight() int {
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
+	bodyHeight := height - 3
+	if bodyHeight < 0 {
+		return 0
+	}
+	return bodyHeight - 2
+}
+
+func (m Model) maxHelpOffset() int {
+	height := m.helpViewHeight()
+	if height <= 0 {
+		return 0
+	}
+	lines := len(strings.Split(m.helpText(), "\n"))
+	if lines <= height {
+		return 0
+	}
+	return lines - height
+}
+
 func (m Model) currentView() (chartView, bool) {
 	if m.current < 0 || m.current >= len(m.order) {
 		return chartView{}, false
@@ -387,9 +444,9 @@ func (m Model) warningText() string {
 	}
 	lines := make([]string, 0, len(view.warnings))
 	for _, warning := range view.warnings {
-		lines = append(lines, m.opts.Locale.T(warning.ID, warningData(warning)))
+		lines = append(lines, domain.SanitizeText(m.opts.Locale.T(warning.ID, warningData(warning))))
 	}
-	return domain.SanitizeText(strings.Join(lines, "\n"))
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) sourceName() string {
@@ -427,6 +484,30 @@ func seriesCount(spec *domain.RenderSpec) int {
 		return len(spec.PieSlices)
 	}
 	return len(spec.Series)
+}
+
+// scrollLines returns the visible window of text at offset. Help content can
+// be taller than the chart body; arrows and j/k scroll it.
+func scrollLines(text string, offset, height int) string {
+	lines := strings.Split(text, "\n")
+	maxOffset := len(lines) - height
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(lines) {
+		return ""
+	}
+	lines = lines[offset:]
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func padBlock(text string, width, height int) string {
@@ -501,5 +582,8 @@ func countLabel(loc *i18n.Localizer, oneID, manyID string, count int) string {
 	if count == 1 {
 		return loc.T(oneID, nil)
 	}
-	return loc.T(manyID, map[string]any{"Count": count})
+	return loc.T(manyID, map[string]any{
+		"Count":     count,
+		"CountText": loc.FormatInt(count),
+	})
 }

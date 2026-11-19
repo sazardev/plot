@@ -5,10 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"os"
+	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/muesli/termenv"
 
+	"github.com/sazar/plot/internal/config"
 	"github.com/sazar/plot/internal/domain"
 	"github.com/sazar/plot/internal/i18n"
 	"github.com/sazar/plot/internal/render"
@@ -16,12 +21,29 @@ import (
 	"github.com/sazar/plot/internal/ui"
 )
 
-func run(args []string, stream appIO) int {
+func run(args []string, stream appIO) (code int) {
+	cleanup := setupLogging(stream)
+	defer cleanup()
+
 	loc, err := i18n.New(resolveLocale(stream.Env))
 	if err != nil {
-		fmt.Fprintf(stream.Err, "pl: %v\n", err)
+		_, _ = fmt.Fprintf(stream.Err, "pl: %v\n", err)
 		return exitData
 	}
+	// A recovered panic never prints a stack: one line to stderr, the stack
+	// only to the debug file, and the documented data-error exit code.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			slog.Error("recovered panic",
+				"panic", fmt.Sprint(recovered),
+				"stack", string(debug.Stack()),
+			)
+			if stream.Err != nil {
+				_, _ = fmt.Fprintln(stream.Err, loc.T("cli.error.panic", nil))
+			}
+			code = exitData
+		}
+	}()
 
 	opts := &cliOptions{}
 	cmd := newCommand(opts, stream, loc)
@@ -35,7 +57,7 @@ func run(args []string, stream appIO) int {
 			}
 			if appErr.id == "" {
 				if appErr.cause != nil {
-					fmt.Fprintln(stream.Err, domain.SanitizeText(appErr.cause.Error()))
+					_, _ = fmt.Fprintln(stream.Err, domain.SanitizeText(appErr.cause.Error()))
 				}
 				return appErr.code
 			}
@@ -50,6 +72,16 @@ func run(args []string, stream appIO) int {
 }
 
 func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) error {
+	if err := applyConfig(opts, stream); err != nil {
+		return err
+	}
+	var cache *storage.Cache
+	if !opts.NoCache {
+		cache = storage.NewCache(opts.CacheDir, opts.CacheTTL, opts.CacheMax)
+		if cache != nil {
+			defer func() { _ = cache.Close() }()
+		}
+	}
 	if opts.LabelSet && strings.TrimSpace(opts.Label) == "" {
 		return usageError("cli.error.label_empty", nil)
 	}
@@ -94,21 +126,17 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 	if opts.TUI {
 		if !stream.InTTY || !stream.OutTTY {
 			if stream.Err != nil {
-				fmt.Fprintln(stream.Err, loc.T("cli.warn.tui_fallback", nil))
+				_, _ = fmt.Fprintln(stream.Err, loc.T("cli.warn.tui_fallback", nil))
 			}
 		} else {
-			return runTUI(args, opts, stream, loc, delimiter, headerMode, colorMode, colorEnabled, glyphMode, theme)
+			return runTUI(args, opts, stream, loc, delimiter, headerMode, colorMode, colorEnabled, glyphMode, theme, cache)
 		}
 	}
 
-	ds, sourcePath, fromStdin, err := loadDataset(args, opts, stream, delimiter, headerMode)
+	ds, sourcePath, fromStdin, pendingWrite, err := loadDataset(args, opts, stream, delimiter, headerMode, cache)
 	if err != nil {
 		return asAppError(err, sourcePath, fromStdin)
 	}
-	if err := domain.Infer(ds); err != nil {
-		return asAppError(err, sourcePath, fromStdin)
-	}
-
 	spec, err := domain.BuildRenderSpec(ds, makeBuildOptions(opts, stream, colorMode, glyphMode, width, height))
 	if err != nil {
 		return asAppError(err, sourcePath, fromStdin)
@@ -127,9 +155,10 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 
 	if stream.Err != nil {
 		for _, warning := range ds.Warnings {
-			fmt.Fprintln(stream.Err, domain.SanitizeText(loc.T(warning.ID, warningData(warning))))
+			_, _ = fmt.Fprintln(stream.Err, domain.SanitizeText(loc.T(warning.ID, warningData(warning))))
 		}
 	}
+	pendingWrite.Save()
 	return nil
 }
 
@@ -150,7 +179,35 @@ func makeBuildOptions(opts *cliOptions, stream appIO, colorMode domain.ColorMode
 	}
 }
 
-func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, header storage.HeaderMode) (*domain.Dataset, string, bool, error) {
+// pendingCache is a best-effort write scheduled for after the first frame.
+type pendingCache struct {
+	cache   *storage.Cache
+	key     string
+	dataset *domain.Dataset
+}
+
+// Save writes the dataset after the chart has been displayed. Failures are
+// debug-level notes and never change output or the exit code.
+func (p *pendingCache) Save() {
+	if p == nil || p.cache == nil || p.key == "" || p.dataset == nil {
+		return
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			slog.Error("recovered cache write panic",
+				"panic", fmt.Sprint(recovered),
+				"stack", string(debug.Stack()),
+			)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := p.cache.Put(ctx, p.key, p.dataset); err != nil {
+		slog.Debug("cache write failed", "error", err)
+	}
+}
+
+func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, header storage.HeaderMode, cache *storage.Cache) (*domain.Dataset, string, bool, *pendingCache, error) {
 	dbPath := strings.TrimSpace(opts.DB)
 	if dbPath == "" && len(args) == 0 {
 		dbPath = strings.TrimSpace(stream.Env["PL_DB"])
@@ -166,30 +223,46 @@ func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, 
 	hasDBSource := dbPath != "" || query != "" || queryFile != ""
 	if hasDBSource && len(args) > 0 {
 		if explicitDB {
-			return nil, "", false, usageError("cli.error.source_conflict", nil)
+			return nil, "", false, nil, usageError("cli.error.source_conflict", nil)
 		}
 		hasDBSource = false
 	}
 	if hasDBSource {
 		if dbPath == "" {
-			return nil, "", false, usageError("cli.error.db_missing", nil)
+			return nil, "", false, nil, usageError("cli.error.db_missing", nil)
 		}
 		if query != "" && queryFile != "" {
-			return nil, "", false, usageError("cli.error.query_conflict", nil)
+			return nil, "", false, nil, usageError("cli.error.query_conflict", nil)
 		}
 		if query == "" && queryFile == "" {
-			return nil, "", false, usageError("cli.error.query_missing", nil)
+			return nil, "", false, nil, usageError("cli.error.query_missing", nil)
 		}
 		if opts.Timeout <= 0 {
-			return nil, "", false, usageError("cli.error.invalid_timeout", nil)
+			return nil, "", false, nil, usageError("cli.error.invalid_timeout", nil)
+		}
+		queryText := query
+		if queryFile != "" {
+			data, err := os.ReadFile(queryFile)
+			if err != nil {
+				return nil, "", false, nil, &domain.SourceError{Path: queryFile, Err: err}
+			}
+			queryText = strings.TrimSpace(string(data))
+		}
+		key := storage.DBCacheKey(dbPath, queryText)
+		if cache != nil {
+			if ds, ok := cache.Get(context.Background(), key); ok {
+				return ds, dbPath, false, nil, nil
+			}
 		}
 		ds, err := storage.ReadSQLite(context.Background(), storage.SQLiteOptions{
-			Path:      dbPath,
-			Query:     query,
-			QueryFile: queryFile,
-			Timeout:   opts.Timeout,
+			Path:    dbPath,
+			Query:   queryText,
+			Timeout: opts.Timeout,
 		})
-		return ds, dbPath, false, err
+		if err != nil {
+			return nil, dbPath, false, nil, err
+		}
+		return inferDataset(ds, cache, key, dbPath, false)
 	}
 
 	options := storage.CSVOptions{
@@ -201,33 +274,126 @@ func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, 
 	switch len(args) {
 	case 0:
 		if stream.InTTY {
-			return nil, "", true, usageError("cli.error.no_input", nil)
+			return nil, "", true, nil, usageError("cli.error.no_input", nil)
 		}
-		options.SourceKind = domain.SourceStdin
-		options.SourceID = "stdin"
-		ds, err := storage.ReadCSV(stream.In, options)
-		return ds, "", true, err
+		return loadStdin(stream.In, options, cache)
 	case 1:
 		if args[0] == "-" {
 			if stream.InTTY {
-				return nil, "", true, usageError("cli.error.no_input", nil)
+				return nil, "", true, nil, usageError("cli.error.no_input", nil)
 			}
-			options.SourceKind = domain.SourceStdin
-			options.SourceID = "stdin"
-			ds, err := storage.ReadCSV(stream.In, options)
-			return ds, "", true, err
+			return loadStdin(stream.In, options, cache)
 		}
-		ds, err := storage.ReadFile(args[0], options)
-		return ds, args[0], false, err
+		return loadOneFile(args[0], options, cache)
 	default:
 		for _, arg := range args {
 			if arg == "-" {
-				return nil, "", true, usageError("cli.error.stdin_with_files", nil)
+				return nil, "", true, nil, usageError("cli.error.stdin_with_files", nil)
 			}
 		}
-		ds, err := storage.ReadFiles(args, options)
-		return ds, args[0], false, err
+		return loadManyFiles(args, options, cache)
 	}
+}
+
+func loadStdin(reader io.Reader, options storage.CSVOptions, cache *storage.Cache) (*domain.Dataset, string, bool, *pendingCache, error) {
+	options.SourceKind = domain.SourceStdin
+	options.SourceID = "stdin"
+	if cache == nil {
+		ds, err := storage.ReadCSV(reader, options)
+		if err != nil {
+			return nil, "", true, nil, err
+		}
+		return inferDataset(ds, nil, "", "", true)
+	}
+	data, err := storage.ReadInput(reader, options.MaxBytes)
+	if err != nil {
+		return nil, "", true, nil, err
+	}
+	key := storage.StdinCacheKey(data, options)
+	if ds, ok := cache.Get(context.Background(), key); ok {
+		return ds, "", true, nil, nil
+	}
+	ds, err := storage.ReadCSVBytes(data, options)
+	if err != nil {
+		return nil, "", true, nil, err
+	}
+	return inferDataset(ds, cache, key, "", true)
+}
+
+func loadOneFile(path string, options storage.CSVOptions, cache *storage.Cache) (*domain.Dataset, string, bool, *pendingCache, error) {
+	options.SourceKind = domain.SourceFile
+	options.SourceID = path
+	if cache == nil {
+		ds, err := storage.ReadFile(path, options)
+		if err != nil {
+			return nil, path, false, nil, err
+		}
+		return inferDataset(ds, nil, "", path, false)
+	}
+	data, err := storage.ReadFileBytes(path, options.MaxBytes)
+	if err != nil {
+		return nil, path, false, nil, err
+	}
+	key := storage.FilesCacheKey([]storage.FileInput{{Path: path, Data: data}}, options)
+	if ds, ok := cache.Get(context.Background(), key); ok {
+		return ds, path, false, nil, nil
+	}
+	ds, err := storage.ReadCSVBytes(data, options)
+	if err != nil {
+		return nil, path, false, nil, err
+	}
+	return inferDataset(ds, cache, key, path, false)
+}
+
+func loadManyFiles(paths []string, options storage.CSVOptions, cache *storage.Cache) (*domain.Dataset, string, bool, *pendingCache, error) {
+	if cache == nil {
+		ds, err := storage.ReadFiles(paths, options)
+		if err != nil {
+			return nil, paths[0], false, nil, err
+		}
+		return inferDataset(ds, nil, "", paths[0], false)
+	}
+	inputs := make([]storage.FileInput, 0, len(paths))
+	for _, path := range paths {
+		data, err := storage.ReadFileBytes(path, options.MaxBytes)
+		if err != nil {
+			return nil, paths[0], false, nil, err
+		}
+		inputs = append(inputs, storage.FileInput{Path: path, Data: data})
+	}
+	key := storage.FilesCacheKey(inputs, options)
+	if ds, ok := cache.Get(context.Background(), key); ok {
+		return ds, paths[0], false, nil, nil
+	}
+	datasets := make([]*domain.Dataset, 0, len(inputs))
+	for _, input := range inputs {
+		fileOptions := options
+		fileOptions.SourceKind = domain.SourceFile
+		fileOptions.SourceID = input.Path
+		ds, err := storage.ReadCSVBytes(input.Data, fileOptions)
+		if err != nil {
+			return nil, paths[0], false, nil, err
+		}
+		datasets = append(datasets, ds)
+	}
+	combined, err := storage.MergeDatasets(datasets, paths)
+	if err != nil {
+		return nil, paths[0], false, nil, err
+	}
+	return inferDataset(combined, cache, key, paths[0], false)
+}
+
+func inferDataset(ds *domain.Dataset, cache *storage.Cache, key, sourcePath string, fromStdin bool) (*domain.Dataset, string, bool, *pendingCache, error) {
+	if err := domain.Infer(ds); err != nil {
+		return nil, sourcePath, fromStdin, nil, err
+	}
+	var pending *pendingCache
+	if cache != nil && key != "" {
+		// BuildRenderSpec applies filters/sorts in place; cache the parsed and
+		// inferred dataset, not the transformed view.
+		pending = &pendingCache{cache: cache, key: key, dataset: domain.CloneDataset(ds)}
+	}
+	return ds, sourcePath, fromStdin, pending, nil
 }
 
 func asAppError(err error, sourcePath string, fromStdin bool) *appError {
@@ -236,4 +402,98 @@ func asAppError(err error, sourcePath string, fromStdin bool) *appError {
 		return appErr
 	}
 	return mapDomainError(err, sourcePath, fromStdin)
+}
+
+func applyConfig(opts *cliOptions, stream appIO) *appError {
+	path := strings.TrimSpace(opts.Config)
+	explicit := path != ""
+	if path == "" {
+		path = strings.TrimSpace(stream.Env["PL_CONFIG"])
+		explicit = path != ""
+	}
+	cfg, err := config.Load(path, explicit)
+	if err != nil {
+		return newAppError(exitUsage, "cli.error.config", map[string]any{
+			"Path":   domain.SanitizeText(path),
+			"Detail": domain.SanitizeText(err.Error()),
+		}, err)
+	}
+	changed := opts.changed
+	if changed == nil {
+		changed = map[string]bool{}
+	}
+
+	if !changed["db"] && strings.TrimSpace(stream.Env["PL_DB"]) == "" && cfg.Database.Path != "" {
+		opts.DB = cfg.Database.Path
+	}
+	queryOverride := changed["query"] || changed["query-file"] ||
+		strings.TrimSpace(stream.Env["PL_QUERY"]) != ""
+	if !queryOverride && cfg.Database.Query != "" {
+		opts.Query = cfg.Database.Query
+	}
+	if !queryOverride && cfg.Database.QueryFile != "" {
+		opts.QueryFile = cfg.Database.QueryFile
+	}
+	if !changed["timeout"] {
+		timeout, err := cfg.Timeout(opts.Timeout)
+		if err != nil {
+			return newAppError(exitUsage, "cli.error.config", map[string]any{
+				"Path":   domain.SanitizeText(cfg.Path),
+				"Detail": domain.SanitizeText(err.Error()),
+			}, err)
+		}
+		opts.Timeout = timeout
+	}
+
+	term := strings.ToLower(strings.TrimSpace(stream.Env["TERM"]))
+	if !changed["color"] && stream.Env["NO_COLOR"] == "" && term != "dumb" && cfg.Display.Color != "" {
+		opts.Color = cfg.Display.Color
+	}
+	if !changed["ascii"] && cfg.Display.ASCII {
+		opts.ASCII = true
+	}
+	if !opts.TUI {
+		if !changed["width"] && cfg.Display.Width != 0 {
+			opts.Width = cfg.Display.Width
+		}
+		if !changed["height"] && cfg.Display.Height != 0 {
+			opts.Height = cfg.Display.Height
+		}
+	}
+
+	if !changed["cache-dir"] {
+		if dir := strings.TrimSpace(stream.Env["PL_CACHE_DIR"]); dir != "" {
+			opts.CacheDir = dir
+		} else if cfg.Cache.Dir != "" {
+			opts.CacheDir = cfg.Cache.Dir
+		}
+	}
+	if !changed["no-cache"] {
+		if strings.TrimSpace(stream.Env["PL_CACHE_DISABLE"]) != "" {
+			opts.NoCache = true
+		} else if cfg.Cache.Enabled != nil && !*cfg.Cache.Enabled {
+			opts.NoCache = true
+		}
+	}
+	if opts.CacheTTL == 0 {
+		opts.CacheTTL = 168 * time.Hour
+	}
+	if opts.CacheMax == 0 {
+		opts.CacheMax = 64 << 20
+	}
+	if ttl, err := cfg.CacheTTL(opts.CacheTTL); err == nil {
+		opts.CacheTTL = ttl
+	} else {
+		return newAppError(exitUsage, "cli.error.config", map[string]any{
+			"Path": domain.SanitizeText(cfg.Path), "Detail": domain.SanitizeText(err.Error()),
+		}, err)
+	}
+	if size, err := cfg.CacheMaxSize(opts.CacheMax); err == nil {
+		opts.CacheMax = size
+	} else {
+		return newAppError(exitUsage, "cli.error.config", map[string]any{
+			"Path": domain.SanitizeText(cfg.Path), "Detail": domain.SanitizeText(err.Error()),
+		}, err)
+	}
+	return nil
 }

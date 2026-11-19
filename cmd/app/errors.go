@@ -53,9 +53,9 @@ func printAppError(w io.Writer, loc *i18n.Localizer, err *appError) {
 	if err == nil || err.id == "" {
 		return
 	}
-	fmt.Fprintln(w, domain.SanitizeText(loc.T(err.id, err.data)))
+	_, _ = fmt.Fprintln(w, domain.SanitizeText(loc.T(err.id, err.data)))
 	if err.code == exitUsage {
-		fmt.Fprintln(w, loc.T("cli.error.usage_hint", nil))
+		_, _ = fmt.Fprintln(w, loc.T("cli.error.usage_hint", nil))
 	}
 }
 

@@ -10,7 +10,7 @@
 - [DESIGN.md](DESIGN.md): the design system: tokens, components and UI rules.
 - [SPEC.md](SPEC.md): what is being built: requirements, acceptance criteria and open questions.
 
-Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input, `internal/render` draws, and `internal/ui` holds the TUI root, keys, styles and messages. A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
+Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input and owns the disposable cache, `internal/render` draws, `internal/ui` holds the TUI root, keys, styles and messages, and `internal/config` loads strict TOML. A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
 
 ## Commands
 
@@ -36,22 +36,24 @@ Read the code around a change before writing: `cmd/app` is the entry point, `int
 | Install git hooks | `lefthook install` |
 | Release dry run | `goreleaser release --snapshot --clean` |
 
-`TODO:` the Makefile/scripts do not exist yet; once added, prefer its targets (`make test`, `make lint`) over the raw commands above and update this table. `TODO:` confirm the goose dialect subcommand and the DSN source (flag vs env vs config file).
+`TODO:` the Makefile/scripts do not exist yet; once added, prefer its targets (`make test`, `make lint`) over the raw commands above and update this table. The goose dialect is `sqlite3`; the runtime cache path is `--cache-dir` > `PL_CACHE_DIR` > `cache.dir` > `os.UserCacheDir()/pl`.
 
 ## Layout
 
 ```
 cmd/app/            entry point: flags, source selection, CLI pipeline, exit codes
 internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, inference); no Bubble Tea/Lip Gloss
-internal/storage/   delimited input (stdin/CSV) and a read-only SQLite source; cache adapter later
+internal/config/    strict TOML config, path resolution, duration/size parsing
+internal/storage/   delimited input (stdin/CSV), read-only SQLite source, disposable SQLite cache
 internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
 internal/ui/        app.go root model, keys.go, styles.go, msgs.go, commands.go
 internal/ui/testdata/  TUI golden files (updated with -update-tui)
 internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)
 internal/testutil/  golden helper; builders and fakes arrive with more tests
-internal/db/        sqlc-generated cache code (future)
-db/migrations/      forward-only goose SQL migrations (future)
-db/queries/         one .sql file per aggregate (future)
+internal/db/        sqlc-generated cache code (never edited by hand)
+db/migrations/      forward-only goose SQL migrations (schema sqlc reads)
+db/queries/         one .sql file per aggregate (cache queries)
+sqlc.yaml           sqlite engine, schema, queries, generated package
 testdata/           sample inputs; render and TUI goldens live in internal/*/testdata
 .github/workflows/  CI: lint, test, build (future)
 ```
@@ -63,9 +65,10 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 - File organisation: one file = one responsibility. The current TUI is a single screen in `internal/ui`; split it into `screens/plot/{model,update,view}.go` when a second screen appears.
 - All styling lives in `internal/ui/styles.go`; all bindings in `internal/ui/keys.go`; every side effect is a `tea.Cmd` constructor in `commands.go`. No IO, timers or HTTP inside `Update` or `View`.
 - Colors are adaptive ANSI roles with a light and dark variant; honor `NO_COLOR`, `TERM=dumb` and non-TTY output. Never paint the app background.
-- Errors: wrap with `%w`, return instead of panicking, and surface user-facing failures as a single line on stderr. Database driver errors are printed verbatim. stdout belongs to plot output and the UI; logs go to a file via `tea.LogToFile` with `log/slog`.
+- Errors: wrap with `%w`, return instead of panicking, and surface user-facing failures as a single line on stderr. Database driver errors are printed verbatim. stdout belongs to plot output and the UI; when `DEBUG` is set, `log/slog` writes only to `os.UserCacheDir()/pl/debug.log`, never to stdout or stderr.
 - i18n: no hard-coded user-facing strings in Go; ids and description go in `internal/i18n/active.en.toml`, translations in `active.<lng>.toml`, both embedded.
 - Tests sit next to the code in the same package (`<pkg>`), or `<pkg>_test` for the public API. Table-driven subtests with `stretchr/testify` `require`/`assert`. Render goldens use `internal/testutil`, TUI goldens use `teatest` or `-update-tui`, fixtures in `testdata/`.
+- Cache writes are best-effort and happen after the first frame, inside a `tea.Cmd` in TUI mode; they never change output or the exit code. Config precedence is flag > environment > config > default; paths in TOML resolve relative to the config file.
 - Generated code (`internal/db/`) is regenerated with `sqlc generate`, never edited by hand, and committed.
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`); Lefthook enforces format, lint and the commit-msg check.
 
@@ -83,7 +86,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 ## Boundaries
 
 - Never commit secrets, DSNs, credentials or `.env` files; database config comes from the environment/config dir, never from source.
-- Never hand-edit `internal/db/`, `go.sum` or generated goldens; regenerate them and review the diff. A new golden file must be justified in the commit.
+- Never hand-edit `internal/db/`, `go.sum` or generated goldens; regenerate them and review the diff. A new golden file must be justified in the commit. Runtime cache migrations live in `internal/storage/cache.go` and must stay in sync with `db/migrations/`.
 - Never add a dependency outside the STACK.md list, or a chart/plotting library, without asking first.
 - Never import Bubble Tea or Lip Gloss from `internal/domain`, import one screen from another, or perform blocking work inside `Update`/`View`.
 - Never write logs or debug output to stdout; it corrupts the chart and the TUI.
@@ -103,5 +106,3 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 - [ ] Docs (STACK/DESIGN/SPEC) still true; changed commands are reflected in this file.
 - [ ] Diff is minimal: no unrelated files, no leftover debug output, no secrets.
 - [ ] Commit message follows Conventional Commits.
-
-`TODO:` STACK.md's SQLite/pgx data-access contradiction is resolved by SPEC.md §15 (SQLite + pure-Go driver); update STACK.md before the cache milestone.

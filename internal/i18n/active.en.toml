@@ -81,6 +81,18 @@ other = "sort rows: column[:asc|desc]; repeated or comma-separated"
 description = "Flag description for --filter."
 other = "filter rows: column<op>value; repeatable (AND)"
 
+["cli.flag.no_cache"]
+description = "Flag description for --no-cache."
+other = "disable the parsed-dataset cache"
+
+["cli.flag.cache_dir"]
+description = "Flag description for --cache-dir."
+other = "cache directory"
+
+["cli.flag.config"]
+description = "Flag description for --config."
+other = "TOML configuration file"
+
 ["cli.flag.tui"]
 description = "Flag description for --tui."
 other = "open the interactive TUI (requires a terminal)"
@@ -225,6 +237,14 @@ other = "TUI needs a terminal on stdin and stdout; using CLI mode"
 description = "Width or height was passed with --tui."
 other = "--tui uses the terminal size; do not pass --width or --height"
 
+["cli.error.panic"]
+description = "A recovered internal panic was printed as one line."
+other = "internal error; rerun with DEBUG=1 to write details to the debug log"
+
+["cli.error.config"]
+description = "The configuration file could not be loaded."
+other = "invalid config {{.Path}}: {{.Detail}}"
+
 ["cli.error.source_conflict"]
 description = "Database and positional file sources were combined."
 other = "use either a database source or file arguments, not both"
@@ -367,7 +387,7 @@ other = "1 row"
 
 ["tui.rows"]
 description = "Row count in the TUI header."
-other = "{{.Count}} rows"
+other = "{{.CountText}} rows"
 
 ["tui.column_one"]
 description = "One column in the TUI header."
@@ -375,11 +395,11 @@ other = "1 column"
 
 ["tui.columns"]
 description = "Column count in the TUI header."
-other = "{{.Count}} columns"
+other = "{{.CountText}} columns"
 
 ["tui.series"]
 description = "Series count in the TUI header."
-other = "{{.Count}} series"
+other = "{{.CountText}} series"
 
 ["tui.warning_one"]
 description = "One warning in the TUI status line."
@@ -387,7 +407,7 @@ other = "1 warning"
 
 ["tui.warnings"]
 description = "Warning count in the TUI status line."
-other = "{{.Count}} warnings"
+other = "{{.CountText}} warnings"
 
 ["tui.status_ready"]
 description = "Status line when the chart is ready."
@@ -396,6 +416,10 @@ other = "ready"
 ["tui.min_size"]
 description = "TUI minimum-size message."
 other = "terminal too small; need 40x20"
+
+["tui.error.internal"]
+description = "An internal panic was recovered while loading the TUI."
+other = "internal error while loading; set DEBUG=1 for details"
 
 ["tui.chart_error"]
 description = "Chart rendering error in the TUI."

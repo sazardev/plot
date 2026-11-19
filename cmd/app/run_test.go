@@ -22,7 +22,7 @@ func testIO(input string, inTTY, outTTY bool) (appIO, *bytes.Buffer, *bytes.Buff
 		Err:    errOut,
 		InTTY:  inTTY,
 		OutTTY: outTTY,
-		Env:    map[string]string{"LANG": "en_US.UTF-8", "TERM": "xterm-256color"},
+		Env:    map[string]string{"LANG": "en_US.UTF-8", "TERM": "xterm-256color", "PL_CONFIG": os.DevNull, "PL_CACHE_DISABLE": "1"},
 		Width:  0,
 		Height: 0,
 	}, out, errOut
@@ -432,7 +432,7 @@ func TestRunHelpListsTransformFlags(t *testing.T) {
 	code := run([]string{"--help"}, stream)
 
 	require.Equal(t, 0, code)
-	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter", "--db", "--query", "--timeout"} {
+	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter", "--db", "--query", "--timeout", "--tui", "--no-motion", "--no-cache", "--cache-dir", "--config"} {
 		assert.Contains(t, out.String(), flag)
 	}
 }
@@ -865,4 +865,306 @@ func TestRunSQLiteBLOBandFilter(t *testing.T) {
 	require.Equal(t, 0, code)
 	assert.Empty(t, errOut.String())
 	assert.Contains(t, out.String(), "<blob 2 byt")
+}
+
+func writeConfig(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	return path
+}
+
+func TestRunUsesConfigDatabase(t *testing.T) {
+	t.Parallel()
+
+	dbPath := createSQLiteFixture(t)
+	configPath := writeConfig(t, "[database]\npath = \""+dbPath+"\"\nquery = \"select day, signups from metrics\"\n")
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{"--config", configPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunFlagsOverrideConfig(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeConfig(t, "[database]\npath = \"missing.db\"\nquery = \"select * from missing\"\n")
+	dbPath := createSQLiteFixture(t)
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{
+		"--config", configPath,
+		"--db", dbPath,
+		"--query", "select day, signups from metrics",
+	}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunEnvironmentOverridesConfig(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeConfig(t, "[database]\npath = \"missing.db\"\nquery = \"select * from missing\"\n")
+	dbPath := createSQLiteFixture(t)
+	stream, out, errOut := testIO("", false, false)
+	stream.Env["PL_DB"] = dbPath
+	stream.Env["PL_QUERY"] = "select day, signups from metrics"
+	code := run([]string{"--config", configPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunMissingConfigIsUsageError(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("", false, false)
+	code := run([]string{"--config", filepath.Join(t.TempDir(), "missing.toml")}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "invalid config")
+}
+
+func TestRunUnknownConfigKeyIsUsageError(t *testing.T) {
+	t.Parallel()
+
+	configPath := writeConfig(t, "[display]\ncolour = \"red\"\n")
+	stream, _, errOut := testIO("", false, false)
+	code := run([]string{"--config", configPath}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "unknown key")
+}
+
+func TestRunConfigDisplayAndRelativeDatabasePath(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "metrics.db")
+	db, err := sql.Open("sqlite", dbPath)
+	require.NoError(t, err)
+	_, err = db.Exec(`create table metrics(day text, signups integer); insert into metrics values ('Mon',3),('Tue',5)`)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	configPath := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+[database]
+path = "metrics.db"
+query = "select day, signups from metrics"
+[display]
+color = "never"
+ascii = true
+`), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{"--config", configPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "Mon")
+	assert.NotContains(t, out.String(), "\x1b[")
+	assert.Contains(t, out.String(), "metrics.db - bar")
+}
+
+func TestRunCacheStdinIsStable(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	input := "month,revenue\nJan,10\nFeb,20\n"
+	runOnce := func() string {
+		stream, out, errOut := testIO(input, false, false)
+		delete(stream.Env, "PL_CACHE_DISABLE")
+		code := run([]string{"--cache-dir", dir}, stream)
+		require.Equal(t, 0, code)
+		assert.Empty(t, errOut.String())
+		return out.String()
+	}
+	first := runOnce()
+	second := runOnce()
+	assert.Equal(t, first, second)
+	_, err := os.Stat(filepath.Join(dir, "cache.db"))
+	require.NoError(t, err)
+}
+
+func TestRunCacheHitsDatabaseResult(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := createSQLiteFixture(t)
+	query := "select day, abs(random() % 100) as value from metrics"
+	runOnce := func() string {
+		stream, out, errOut := testIO("", false, false)
+		delete(stream.Env, "PL_CACHE_DISABLE")
+		code := run([]string{"--cache-dir", dir, "--db", path, "--query", query}, stream)
+		require.Equal(t, 0, code)
+		assert.Empty(t, errOut.String())
+		return out.String()
+	}
+	first := runOnce()
+	second := runOnce()
+	assert.Equal(t, first, second)
+}
+
+func TestRunNoCacheDoesNotCreateDatabase(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	stream, _, _ := testIO("month,revenue\nJan,10\n", false, false)
+	code := run([]string{"--cache-dir", dir, "--no-cache"}, stream)
+	require.Equal(t, 0, code)
+	_, err := os.Stat(filepath.Join(dir, "cache.db"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRunUnwritableCacheStillRenders(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-directory")
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+	stream, out, errOut := testIO("month,revenue\nJan,10\n", false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	code := run([]string{"--cache-dir", blocker}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "Jan")
+}
+
+func TestRunConfigCanDisableCache(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	configPath := writeConfig(t, "[cache]\nenabled = false\ndir = \""+dir+"\"\n")
+	stream, _, _ := testIO("month,revenue\nJan,10\n", false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	code := run([]string{"--config", configPath}, stream)
+	require.Equal(t, 0, code)
+	_, err := os.Stat(filepath.Join(dir, "cache.db"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRunDebugLogWritesOnlyToFile(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheHome)
+
+	cacheDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(cacheDir, "cache.db"), []byte("not a database"), 0o600))
+
+	stream, out, errOut := testIO("month,revenue\nJan,10\n", false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	stream.Env["DEBUG"] = "1"
+	code := run([]string{"--cache-dir", cacheDir}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "Jan")
+	assert.Empty(t, errOut.String())
+
+	debugPath := filepath.Join(cacheHome, "pl", "debug.log")
+	info, err := os.Stat(debugPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	content, err := os.ReadFile(debugPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "cache read unavailable")
+}
+
+func TestRunEnvironmentCacheDirectoryAndDisable(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	stream, out, errOut := testIO("month,revenue\nJan,10\n", false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	stream.Env["PL_CACHE_DIR"] = dir
+	code := run(nil, stream)
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "Jan")
+	_, err := os.Stat(filepath.Join(dir, "cache.db"))
+	require.NoError(t, err)
+
+	disabledDir := t.TempDir()
+	stream, _, _ = testIO("month,revenue\nJan,10\n", false, false)
+	stream.Env["PL_CACHE_DIR"] = disabledDir
+	stream.Env["PL_CACHE_DISABLE"] = "1"
+	code = run(nil, stream)
+	require.Equal(t, 0, code)
+	_, err = os.Stat(filepath.Join(disabledDir, "cache.db"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestRunConfigFlagWinsOverEnvironment(t *testing.T) {
+	t.Parallel()
+
+	dbPath := createSQLiteFixture(t)
+	configPath := writeConfig(t, "[database]\npath = \""+dbPath+"\"\nquery = \"select day, signups from metrics\"\n")
+	stream, out, errOut := testIO("", false, false)
+	stream.Env["PL_CONFIG"] = filepath.Join(t.TempDir(), "missing.toml")
+	code := run([]string{"--config", configPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunCacheStoresUntransformedDataset(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	input := "month,revenue\nJan,10\nFeb,20\nMar,30\n"
+
+	stream, _, errOut := testIO(input, false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	code := run([]string{"--cache-dir", dir, "--filter", "revenue>=20"}, stream)
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+
+	stream, out, errOut := testIO(input, false, false)
+	delete(stream.Env, "PL_CACHE_DISABLE")
+	code = run([]string{"--cache-dir", dir}, stream)
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "Jan", "the cache must not store a filtered dataset")
+}
+
+func TestRunQueryFlagOverridesConfigQueryFile(t *testing.T) {
+	t.Parallel()
+
+	dbPath := createSQLiteFixture(t)
+	dir := t.TempDir()
+	queryFile := filepath.Join(dir, "query.sql")
+	require.NoError(t, os.WriteFile(queryFile, []byte("select * from missing"), 0o600))
+	configPath := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("[database]\npath = \""+dbPath+"\"\nquery_file = \"query.sql\"\n"), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{"--config", configPath, "--query", "select day, signups from metrics"}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunEnvironmentQueryOverridesConfigQueryFile(t *testing.T) {
+	t.Parallel()
+
+	dbPath := createSQLiteFixture(t)
+	dir := t.TempDir()
+	queryFile := filepath.Join(dir, "query.sql")
+	require.NoError(t, os.WriteFile(queryFile, []byte("select * from missing"), 0o600))
+	configPath := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("[database]\npath = \""+dbPath+"\"\nquery_file = \"query.sql\"\n"), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	stream.Env["PL_QUERY"] = "select day, signups from metrics"
+	code := run([]string{"--config", configPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
 }

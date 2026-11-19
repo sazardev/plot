@@ -1,106 +1,61 @@
-# STACK.md: Go TUI (Bubble Tea)
+# STACK.md: Go terminal data plotter (CLI + Bubble Tea TUI)
 
 ## Summary
 
-A TUI (terminal user interface) application in Go built on Charm's Bubble Tea, which follows the Elm architecture: a
-`Model` holds state, `Update` turns messages into a new model plus commands, `View` renders a string. Side effects
-(IO, timers, HTTP) run only inside `tea.Cmd`s and come back as messages. The screen is a tree of small components, each
-with its own model, messages and view; the domain logic lives outside the UI and is plain, testable Go.
+`pl` is a CLI-first terminal data plotter in Go: it reads delimited text from stdin or files, or runs a read-only
+SQLite query, infers columns and renders line, bar, pie and donut charts as terminal characters. The default path
+is pipe-friendly and has no TUI dependency at runtime. `--tui` opts into a Bubble Tea view, which follows the Elm
+architecture: a `Model` holds state, `Update` turns messages into a new model plus commands, `View` renders a string.
+Side effects (IO, timers, cache writes) run only inside `tea.Cmd`s and come back as messages. Domain, parsing,
+rendering and configuration are plain Go packages outside the UI.
 
 ## Stack
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| Language | Go 1.25+ | One static binary, fast startup, trivial cross-compilation |
-| TUI runtime | `github.com/charmbracelet/bubbletea` | Elm architecture: predictable state, side effects as commands |
-| Components | `github.com/charmbracelet/bubbles` (list, table, textinput, viewport, spinner, help, key) | Tested building blocks with key bindings and help |
-| Styling | `github.com/charmbracelet/lipgloss` | Declarative styles, layout (`JoinHorizontal`, `Place`), adaptive colors |
-| Forms | `github.com/charmbracelet/huh` | Prompts and multi-step forms that embed in a Bubble Tea program |
-| Markdown | `github.com/charmbracelet/glamour` | Renders help, docs and previews in the terminal |
-| CLI entry | `github.com/spf13/cobra` (or `flag` for one command) | Subcommands, flags, completions |
-| Config | TOML/YAML in `os.UserConfigDir()` + env overrides | Follows the platform's conventions |
-| Logging | `log/slog` to a file (`tea.LogToFile`) | stdout belongs to the UI |
-| Testing | `testing` + `github.com/charmbracelet/x/exp/teatest` (golden files) | Whole-program tests with final output snapshots |
+| Language | Go 1.26+ | One static binary, fast startup, trivial cross-compilation |
+| CLI entry | `github.com/spf13/cobra` + `pflag` | Flags, help, usage errors and exit-code mapping |
+| TUI runtime | `github.com/charmbracelet/bubbletea` (`--tui` only) | Elm architecture: predictable state, side effects as commands |
+| Components | `github.com/charmbracelet/bubbles` (spinner, help, key) | Tested building blocks with key bindings and help |
+| Styling | `github.com/charmbracelet/lipgloss` | Declarative styles, layout, adaptive colors |
+| Renderer | `internal/render` (plain Go) | Pure chart layout, braille/block glyphs and ANSI; no Bubble Tea or Lip Gloss |
+| Input | `encoding/csv` with detection + `github.com/mattn/go-runewidth` | RFC 4180 parsing and terminal cell widths |
+| Database source | `modernc.org/sqlite` (pure Go, CGO-free) | Read-only local SQLite; PostgreSQL/MySQL arrive through `psql --csv`/`mysql --batch` pipes |
+| Cache | SQLite + `sqlc` + `goose`-authored migrations | Typed cache queries, versioned schema, WAL, disposable data |
+| Config | TOML (`github.com/BurntSushi/toml`) in `os.UserConfigDir()/pl` + env/flags | Strict keys, documented precedence: flag > env > config > default |
+| Logging | `log/slog` to `DEBUG`-gated `os.UserCacheDir()/pl/debug.log` | stdout belongs to the chart; stderr to user-facing errors |
+| Internationalization | go-i18n v2 (`nicksnyder/go-i18n`, TOML files embedded with `embed`) + `golang.org/x/text` | CLDR plurals, locale number separators, English fallback |
+| Testing | `testing` + `stretchr/testify` + `teatest` + fuzz targets | Unit, golden, whole-program and parser/inference fuzzing |
 | Lint | golangci-lint v2 | One config, many linters |
-| Release | GoReleaser (`.goreleaser.yaml`): cross-compiled archives, checksums, SBOM, Homebrew tap, on every `v*` tag | One tag = a complete, reproducible release |
-| Database | SQLite (one file, WAL mode, `foreign_keys=ON`, versioned migrations) | Zero operations: no server, trivial backups, fast for one writer |
-| Data access | sqlc (SQL queries in `.sql` files compiled to typed Go, `pgx` driver, migrations with `goose`) | Plain SQL reviewed as SQL, generated code with no runtime reflection |
-| Internationalization | go-i18n v2 (`nicksnyder/go-i18n`, TOML/JSON message files embedded with `embed`, `golang.org/x/text/language`) | CLDR plurals and template data with no code generation |
-| Unit tests | Go `testing` with table-driven subtests and `stretchr/testify` (`require`, `assert`) | Standard tooling plus readable assertions |
-| CI | GitHub Actions (`.github/workflows/ci.yml`) on every pull request and push to `main` | Runs the same quality gates as local, next to the code review |
-| Hooks | Lefthook (`lefthook.yml`): pre-commit format + lint on staged files, commit-msg Conventional Commits check | Problems caught before they reach CI, in parallel and in milliseconds |
-| Updates | Renovate (`renovate.json`): grouped weekly updates, automerge for patch and lockfile maintenance | Dependencies stay current in small, reviewable steps |
+| Release | GoReleaser (`.goreleaser.yaml`): static linux/darwin/windows archives, checksums, SBOM | One tag = a complete, reproducible release |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) on every pull request and push to `main` | Runs the same quality gates as local |
+| Hooks | Lefthook (`lefthook.yml`): pre-commit format + lint, commit-msg Conventional Commits | Problems caught before they reach CI |
+| Updates | Renovate (`renovate.json`): grouped weekly updates | Dependencies stay current in small reviewable steps |
 
 ## Project layout
 
 ```
-cmd/app/main.go                  flags/cobra, config load, builds the root model, tea.NewProgram(...).Run()
+cmd/app/                          entry point: flags, config, source selection, CLI pipeline, TUI wiring, exit codes
 internal/
-  domain/                        plain Go: types and rules, no Bubble Tea imports
-    task.go                      Task entity and its invariants
-    store.go                     TaskStore port (interface)
-  storage/
-    file_store.go                implements TaskStore (JSON/SQLite on disk)
-  ui/
-    app.go                       root model: owns the active screen, routes messages, global keys (quit, help)
-    keys.go                      key.Binding map shared by help views
-    styles.go                    every lipgloss.Style and color in one place (adaptive light/dark)
-    msgs.go                      app-wide messages (errMsg, tasksLoadedMsg, windowSizeMsg handling)
-    commands.go                  tea.Cmd constructors that call the domain/storage (loadTasks, saveTask)
-    screens/
-      list/
-        model.go                 list screen: Model, Init
-        update.go                Update: messages → new state + commands
-        view.go                  View: pure rendering from the model
-      detail/{model,update,view}.go
-      edit/form.go               huh form embedded as a component
-    components/
-      statusbar.go               one reusable component per file
-testdata/                        teatest golden files (*.golden)
+  config/                         strict TOML config, path resolution, duration/size parsing
+  domain/                         plain Go types and rules: Dataset, inference, transforms, RenderSpec
+  storage/                        delimited input, read-only SQLite source, disposable SQLite cache
+  render/                         pure chart layout, glyphs, ANSI theme and locale number formatting
+  ui/                             Bubble Tea single-screen root: app.go, keys.go, styles.go, commands.go
+    testdata/                     TUI golden files (updated with -update-tui)
+  i18n/                           bundle setup plus active.<lang>.toml messages (go:embed)
+  db/                             sqlc-generated cache code (never edited by hand)
+  testutil/                       golden helper shared by render/TUI tests
+db/migrations/                    forward-only goose SQL migrations (schema sqlc reads)
+db/queries/                       one .sql file per aggregate (cache queries)
+sqlc.yaml                         sqlite engine, schema, queries, output package
+testdata/                         sample inputs; render/TUI goldens live in internal/*/testdata
 ```
 
-Dependency direction: `cmd → ui → domain ← storage`. `domain` never imports Bubble Tea or Lip Gloss; screens never
-import each other: they talk through messages handled by `app.go`.
-
-```
-migrations/                    numbered, forward-only SQL migrations
-data/app.db                    the database file (git-ignored; with its -wal and -shm files)
-```
-
-```
-sqlc.yaml                      engine, schema (migrations folder), queries folder, output package
-db/migrations/                 goose SQL migrations (the schema sqlc reads)
-db/queries/                    one .sql file per aggregate, each query named with `-- name: GetUser :one`
-internal/db/                   generated code (never edited by hand), committed
-```
-
-```
-internal/i18n/bundle.go        bundle setup, language matcher, Localizer per request
-internal/i18n/active.en.toml   source messages (id, description, one/other)
-internal/i18n/active.<lng>.toml  translations per language, loaded through go:embed
-```
-
-```
-internal/<pkg>/<file>_test.go  tests next to the code, same package for white-box, `<pkg>_test` for the public API
-internal/testutil/             builders, fixtures, fake clock and fake clients shared by tests
-testdata/                      golden files and sample inputs (ignored by the Go tool)
-```
-
-```
-.goreleaser.yaml               builds (CGO_ENABLED=0, linux/darwin/windows × amd64/arm64), archives, checksum, brews
-```
-
-```
-.github/workflows/ci.yml       jobs: lint (format + lint + typecheck), test, build; dependency cache; concurrency per branch
-```
-
-```
-lefthook.yml                   pre-commit: format + lint ({staged_files}); commit-msg: conventional commit check
-```
-
-```
-renovate.json                  extends config:recommended; schedule; packageRules: groups, automerge patch
-```
+Dependency direction: `cmd → ui → render → domain` and `cmd → storage → domain`; `cmd → config` and
+`cmd → i18n` are edges. `domain` never imports Bubble Tea or Lip Gloss; `render` never imports Lip Gloss or the UI;
+`storage` depends on `domain` ports only. Screens never import each other and talk through messages handled by
+`ui/app.go`.
 
 ## Conventions
 
@@ -111,23 +66,21 @@ renovate.json                  extends config:recommended; schedule; packageRule
 - `tea.WindowSizeMsg` is stored in the root and passed down; components never assume a terminal size.
 - Styles and colors only from `ui/styles.go`; use `lipgloss.AdaptiveColor` so light and dark terminals both work.
 - Key bindings are `key.Binding`s with help text; the help bubble shows them, so every key is discoverable.
-- New screen = a folder under `ui/screens/` with model/update/view + its messages + a route in `app.go` + a teatest test.
-- Path from configuration (`DATABASE_PATH`); the directory is a persistent volume in containers.
-- On every connection: `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`, `PRAGMA busy_timeout=5000`.
-- One writer at a time: keep write transactions short and never hold one across a network call.
-- Types are loose: add `CHECK` constraints and `STRICT` tables where the driver supports them.
-- Back up with `sqlite3 data/app.db ".backup out.db"`, never by copying a live file.
-- Write the query in `db/queries/`, run `sqlc generate`, commit the generated code.
-- Name queries by intent (`ListOrdersByCustomer`) and annotate with `:one`, `:many`, `:exec`.
-- Repositories wrap the generated `Queries`; handlers never import `internal/db` directly.
-- Transactions use `pool.Begin` and `queries.WithTx(tx)`.
-- Use `sqlc.arg` / `sqlc.narg` for named and nullable parameters.
-- Messages have stable IDs (`checkout.paid`) and a `description` for translators; the `en` file is the source.
-- A `*i18n.Localizer` is created per request from `Accept-Language` / the user setting with `language.NewMatcher`; no global current language.
-- Call sites use `localizer.Localize(&i18n.LocalizeConfig{MessageID: ..., TemplateData: ..., PluralCount: n})`; the text is not formatted before translation.
+- The current TUI is one screen in `internal/ui`; split it into `ui/screens/plot/{model,update,view}.go` only when a second screen appears.
+- Cache connections: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=250`; keep writes short and best-effort.
+- Cache reads never create or migrate the database; an absent/uninitialized cache is a miss. Writes run after the
+  first frame, are user-only (`0700`/`0600`) and never change output or the exit code.
+- The source database is read-only (`mode=ro`, `query_only=ON`, `busy_timeout=5000`); `pl` never writes to it.
+- Write cache queries in `db/queries/`, run `sqlc generate`, commit the generated code; never edit `internal/db/`.
+- Name queries by intent (`GetCacheEntry`) and annotate with `:one`, `:many`, `:exec`.
+- Cache tables are `STRICT` where supported and use forward-only goose migrations; runtime applies the same
+  embedded statements with `PRAGMA user_version`, not a CGO goose driver.
+- Messages have stable IDs (`cli.error.config`) and a `description` for translators; the `en` file is the source.
+- One `*i18n.Localizer` is created per process from `PL_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG` > `en`; there is no HTTP request and no global current language.
+- Call sites use `Localizer.T(id, data)`; the text is not formatted before translation. Missing IDs fall back to the ID and log at debug level, never panic.
 - Plurals use `one` / `other` (and more forms where the language needs them) in the message file.
 - Number, currency and date formatting use `golang.org/x/text/message` printers for the same language tag.
-- Errors for users are translated at the edge (handler); internal errors and logs stay in English.
+- Errors for users are translated at the CLI/TUI edge; internal errors and logs stay in English.
 - Table-driven: `tests := []struct{ name string; ...; want ... }{...}` and `t.Run(tt.name, func(t *testing.T) { ... })`.
 - `require` for conditions that make the rest meaningless (errors, nil), `assert` for independent checks; expected first, actual second.
 - Mark helpers with `t.Helper()`, use `t.Cleanup` for teardown, `t.TempDir()` for files and `t.Setenv` for environment.
@@ -150,23 +103,24 @@ renovate.json                  extends config:recommended; schedule; packageRule
 
 | Task | Command |
 | --- | --- |
-| Run | `go run ./cmd/app` |
-| Build | `go build -o bin/app ./cmd/app` |
-| Test race | `go test -race -count=1 ./...` |
-| Update golden files | `go test ./internal/ui/... -update` |
+| Run on a file | `go run ./cmd/app data.csv` |
+| Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/app` |
+| Run the TUI | `go run ./cmd/app --tui data.csv` |
+| Build | `CGO_ENABLED=0 go build -o pl ./cmd/app` |
+| Test | `go test ./...` |
+| Test race | `go test -race ./...` |
+| Update render goldens | `go test ./internal/render -update` |
+| Update TUI goldens | `go test ./internal/ui -update-tui` |
 | Lint | `golangci-lint run` |
-| Format | `gofmt -w .` |
-| Debug log | `DEBUG=1 go run ./cmd/app` then `tail -f debug.log` |
-| Release (dry run) | `goreleaser release --snapshot --clean` |
-| Shell | `sqlite3 data/app.db` |
-| Backup | `sqlite3 data/app.db ".backup backup.db"` |
-| Generate | `sqlc generate` |
-| Vet | `sqlc vet` |
-| Migrate | `goose -dir db/migrations postgres "$DATABASE_URL" up` |
-| Migration new | `goose -dir db/migrations create <name> sql` |
-| i18n merge | `goi18n merge -format toml -outdir internal/i18n internal/i18n/active.*.toml` |
+| Format | `gofmt -l -w .` |
+| Vet | `go vet ./...` |
+| Generate cache code | `sqlc generate` |
+| New cache migration | `goose -dir db/migrations create <name> sql` |
+| Apply cache migration (authoring) | `goose -dir db/migrations sqlite3 /tmp/pl-cache.db up` |
+| Debug log | `DEBUG=1 go run ./cmd/app data.csv`, then read `$XDG_CACHE_HOME/pl/debug.log` |
+| Inspect cache (Linux) | `sqlite3 ~/.cache/pl/cache.db` |
+| Release dry run | `goreleaser release --snapshot --clean` |
 | Coverage | `go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out` |
-| Check config | `goreleaser check` |
 | Install hooks | `lefthook install` |
 
 ## Testing
@@ -176,19 +130,18 @@ renovate.json                  extends config:recommended; schedule; packageRule
 - Whole program: `teatest.NewTestModel` with a fixed size (`teatest.WithInitialTermSize(80, 24)`), send keys, wait for output, compare the final output with a golden file.
 - Force a stable color profile in tests (`lipgloss.SetColorProfile(termenv.Ascii)`) so golden files do not depend on the terminal.
 - A bug fix starts with a failing test that reproduces the key sequence.
-- Tests use a temporary file or `:memory:` with the real migrations applied, so schema and constraints are the production ones.
+- Cache tests use temporary directories and the real embedded schema; source tests use a temporary SQLite file in read-only mode.
 - A test loads every message file and checks each ID and template variable exists in every language.
 
 ## Quality gates
 
 - `gofmt` clean, `golangci-lint run` with zero issues (errcheck, govet, staticcheck, revive, gocritic).
 - `go test -race ./...` passes and golden files are committed and up to date.
-- The binary starts in under 100 ms and never writes to stdout outside the program (logs go to a file).
-- `go test -race ./...` passes.
+- The binary starts in under 100 ms and never writes logs to stdout/stderr (logs go to a file).
 
 ## Dependencies
 
-- Charm libraries for the UI, the standard library for everything else.
+- Charm libraries for the UI, `modernc.org/sqlite` for SQLite, `BurntSushi/toml` for config, go-i18n/x-text for localization, and the standard library for the rest.
 - Allowed: the table above. Anything else needs a reason in the PR.
 - Do NOT use: tview/termui/gocui alongside Bubble Tea (two UI models), `fmt.Print` while the program runs (corrupts the screen), global mutable state shared between components, goroutines that write to the model directly (send a message with `p.Send` or a command instead).
 
@@ -204,11 +157,11 @@ renovate.json                  extends config:recommended; schedule; packageRule
 - Every new screen gets a teatest golden test; regenerate golden files only when the change is intended and say so.
 - Quit cleanly on `ctrl+c` and `q`, restoring the terminal (no `os.Exit` inside the program).
 - Never commit the `.db`, `-wal` or `-shm` files; add them to `.gitignore`.
-- Never open the same database from several processes that write heavily; if that is needed, say so and propose PostgreSQL.
+- Never hold a cache write transaction open; cache contention is handled with a short busy timeout and skipped.
 - Always bind parameters; never concatenate user input into SQL.
 - Never edit files in `internal/db/`; change the `.sql` and regenerate.
 - CI fails if `sqlc generate` leaves a diff.
-- Never build SQL strings by concatenation outside sqlc; use parameters.
+- Cache SQL lives in sqlc; source SQL is the user-provided read-only query and is never concatenated by `pl`.
 - Never hardcode a user-facing string in handlers; add a message ID and translate it for every language.
 - Never concatenate translated fragments; use `TemplateData`.
 - Never panic on a missing translation; fall back to the default language and log it.

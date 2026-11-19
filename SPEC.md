@@ -299,9 +299,10 @@ animations.
   file first.
 - Given TUI mode on a TTY, then the alternate screen is used, the cursor is hidden while running, and the view has:
   a title/source header, a rounded chart frame, a status bar and a one-line help bar.
-- Keys: `q`/`Ctrl+C` quit; `tab`/`shift+tab` cycle compatible chart types; arrows and `hjkl` scroll; `?` toggles
-  full help; `esc` closes help. Every binding is a `key.Binding` with help text; no Alt/function keys are required.
-  Mouse capture is not enabled in v1.
+- Keys: `q`/`Ctrl+C` quit; `tab`/`shift+tab` cycle compatible chart types; arrows and `hjkl` scroll overflowing
+  content (the full help panel; charts are fit to the viewport and do not scroll); `?` toggles full help; `esc`
+  closes help. Every binding is a `key.Binding` with help text; no Alt/function keys are required. Mouse capture is
+  not enabled in v1.
 - Given a chart-type change, the new chart redraws in place with a highlight/fade of at most 150 ms; there is no
   sliding screen transition (DESIGN.md). First paint reveals marks over at most 400 ms at ≤30 fps.
 - Reduced motion: `--no-motion`, `NO_COLOR`, `TERM=dumb`, or `CI` set ⇒ no animation; the first frame is static.
@@ -646,8 +647,8 @@ cycle with `internal/ui/styles.go`.
 
 ### 11.1 CLI rendering
 
-- Layout: one title line (title plus muted row/series/null counts), the chart body with y-axis labels and up to two
-  x-axis lines, and a legend of one or two lines. No outer border in CLI mode; data area is prioritized.
+- Layout: one title line (`--title`, or `<source> — <type>` per FR-7), the chart body with y-axis labels and up to
+  two x-axis lines, and a legend of one or two lines. No outer border in CLI mode; data area is prioritized.
 - Line chart: braille subcells (2×4 per cell), 5 y ticks, sampled x labels, markers at sampled points for
   multi-series readability, gaps for nulls.
 - Bar chart: vertical block-element bars from a zero baseline; positive bars up, negative bars down; one-cell gaps
@@ -822,28 +823,25 @@ The previous draft's Q1–Q16 are resolved as follows. Later changes need a spec
 - Custom palettes/themes, additional locales (English is the source and required fallback), shell completions.
 - Windows legacy-console color support (Windows Terminal is the supported ANSI path).
 
-## 15. Stack alignment and required updates
+## 15. Stack alignment
 
-The spec follows STACK.md, DESIGN.md and AGENTS.md. These small mismatches should be corrected in those documents
-before or with the first implementation PR:
+The spec follows STACK.md, DESIGN.md and AGENTS.md. These resolutions are reflected in those documents:
 
-| Document | Current text | Change |
-| --- | --- | --- |
-| `STACK.md` | Data access names the `pgx` driver. | v1 is SQLite only: `sqlc` engine `sqlite`, pure-Go `modernc.org/sqlite` driver; no pgx. |
-| `STACK.md`, `AGENTS.md` | `Task`/`TaskStore` leftovers in the layout/example test. | Replace with `Dataset`/`Column`/`RenderSpec`/`CacheStore`; example test becomes an inference test. |
-| `STACK.md` | `data/app.db` and `DATABASE_PATH` as the app database. | The only persistent store is the disposable cache at `os.UserCacheDir()/pl/cache.db`; source DB is `--db`/`PL_DB`. Keep `data/` for dev fixtures only. |
-| `STACK.md`, `AGENTS.md` | Layout has no pure renderer package. | Add `internal/render/` (pure chart layout/glyphs, no Bubble Tea/Lip Gloss) as in §10.1. |
-| `AGENTS.md` | Exit-code table is a TODO. | Use §9.3. |
-| `AGENTS.md` | sqlc engine/DSN TODO. | SQLite cache; `sqlc.yaml` engine `sqlite`; use the pure-Go driver so the app stays CGO-free. |
-| `STACK.md` | Goose example uses `postgres "$DATABASE_URL"`. | Use goose to author/validate SQLite migrations; the app applies the embedded SQL with `PRAGMA user_version` at runtime, not a CGO goose driver. Source queries are runtime SQL, not sqlc. |
-| `STACK.md` | Dependencies table does not name a SQLite driver. | Add `modernc.org/sqlite` (pure Go, CGO-free) with the NFR-4 reason; everything else is already listed. |
-| `STACK.md` | Build command is `go build -o bin/app ./cmd/app`. | `go build -o bin/pl ./cmd/app` (AGENTS already builds `pl`). |
-| `STACK.md` | i18n text mentions `Accept-Language`/per-request localizers. | CLI resolves the locale from `PL_LANG`/`LC_*`/`LANG`; no HTTP request. |
+- v1 reads SQLite only, read-only and CGO-free through `modernc.org/sqlite`; PostgreSQL and MySQL are served by
+  `psql --csv` / `mysql --batch` pipes. There is no `pgx` dependency.
+- The only persistent store `pl` writes is the disposable cache at `os.UserCacheDir()/pl/cache.db`; source
+  databases are never modified. `sqlc` generates typed cache queries, `goose` authors the migrations, and the app
+  applies the same embedded statements with `PRAGMA user_version` at runtime.
+- `internal/render/` is a pure chart package: no Bubble Tea and no Lip Gloss. `internal/domain/` stays plain Go.
+- The TUI is a single screen in `internal/ui`; it splits into `screens/plot/` only when a second screen appears.
+- The locale comes from `PL_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG` > `en`; there is no HTTP request or per-request
+  localizer.
+- Commands build `bin/pl` or `pl` with `CGO_ENABLED=0`; the documented exit codes are §9.3.
 
 DESIGN.md needs no rule changes: this spec uses its adaptive ANSI roles, Okabe-Ito palette, braille/block glyphs,
 ASCII fallback, 80×24 target, 40×20 minimum, TUI 100-cell content column, rounded TUI frame, no background
-painting, and reduced-motion rules. The only added runtime dependencies are the pure-Go SQLite driver and a
-display-width helper (the latter is already in the Charm dependency tree via Lip Gloss).
+painting, and reduced-motion rules. The added runtime dependencies are the pure-Go SQLite driver, TOML parser and
+`golang.org/x/text` (already present for i18n).
 
 ## 16. Milestones
 

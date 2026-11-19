@@ -35,25 +35,13 @@ const defaultMaxBytes = 1 << 30 // 1 GiB, SPEC FR-1.
 
 // ReadFile opens path and parses it as delimited text.
 func ReadFile(path string, opts CSVOptions) (*domain.Dataset, error) {
-	f, err := os.Open(path)
+	data, err := ReadFileBytes(path, opts.MaxBytes)
 	if err != nil {
-		return nil, &domain.SourceError{Path: path, Err: err}
+		return nil, err
 	}
-	defer f.Close()
-
-	if info, statErr := f.Stat(); statErr == nil && info.Size() > 0 {
-		limit := opts.MaxBytes
-		if limit <= 0 {
-			limit = defaultMaxBytes
-		}
-		if info.Size() > limit {
-			return nil, &domain.InputTooLargeError{Limit: limit}
-		}
-	}
-
 	opts.SourceKind = domain.SourceFile
 	opts.SourceID = path
-	ds, err := ReadCSV(f, opts)
+	ds, err := ReadCSVBytes(data, opts)
 	if err != nil {
 		if errors.Is(err, domain.ErrNoData) ||
 			errors.Is(err, domain.ErrInputTooLarge) ||
@@ -66,35 +54,66 @@ func ReadFile(path string, opts CSVOptions) (*domain.Dataset, error) {
 	return ds, nil
 }
 
+// ReadFileBytes reads a source file with the same size limit as ReadFile.
+func ReadFileBytes(path string, maxBytes int64) ([]byte, error) {
+	limit := maxBytes
+	if limit <= 0 {
+		limit = defaultMaxBytes
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, &domain.SourceError{Path: path, Err: err}
+	}
+	defer func() { _ = file.Close() }()
+	if info, statErr := file.Stat(); statErr == nil && info.Size() > limit {
+		return nil, &domain.InputTooLargeError{Limit: limit}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return nil, &domain.SourceError{Path: path, Err: err}
+	}
+	if int64(len(data)) > limit {
+		return nil, &domain.InputTooLargeError{Limit: limit}
+	}
+	return data, nil
+}
+
 // ReadFiles parses several files and concatenates rows when their schemas
 // match. The first file owns the schema; every later file must match it.
 func ReadFiles(paths []string, opts CSVOptions) (*domain.Dataset, error) {
 	if len(paths) == 0 {
 		return nil, domain.ErrNoData
 	}
-	combined, err := ReadFile(paths[0], opts)
-	if err != nil {
-		return nil, err
-	}
-	combined.SourceID = paths[0]
-	combined.SourceCount = len(paths)
-
-	for _, path := range paths[1:] {
-		next, err := ReadFile(path, opts)
+	datasets := make([]*domain.Dataset, 0, len(paths))
+	for _, path := range paths {
+		ds, err := ReadFile(path, opts)
 		if err != nil {
 			return nil, err
 		}
+		datasets = append(datasets, ds)
+	}
+	return MergeDatasets(datasets, paths)
+}
+
+// MergeDatasets combines already-parsed files after validating their schema.
+func MergeDatasets(datasets []*domain.Dataset, paths []string) (*domain.Dataset, error) {
+	if len(datasets) == 0 {
+		return nil, domain.ErrNoData
+	}
+	combined := datasets[0]
+	for i := 1; i < len(datasets); i++ {
+		next := datasets[i]
 		if len(next.Columns) != len(combined.Columns) {
 			return nil, &domain.SourceError{
-				Path: path,
+				Path: paths[i],
 				Err:  fmt.Errorf("expected %d fields, got %d", len(combined.Columns), len(next.Columns)),
 			}
 		}
-		for i := range combined.Columns {
-			if next.Columns[i].Name != combined.Columns[i].Name {
+		for column := range combined.Columns {
+			if next.Columns[column].Name != combined.Columns[column].Name {
 				return nil, &domain.SourceError{
-					Path: path,
-					Err:  fmt.Errorf("expected column %q, got %q", combined.Columns[i].Name, next.Columns[i].Name),
+					Path: paths[i],
+					Err:  fmt.Errorf("expected column %q, got %q", combined.Columns[column].Name, next.Columns[column].Name),
 				}
 			}
 		}
@@ -102,6 +121,9 @@ func ReadFiles(paths []string, opts CSVOptions) (*domain.Dataset, error) {
 		combined.RowCount += next.RowCount
 		combined.Warnings = append(combined.Warnings, next.Warnings...)
 	}
+	combined.SourceKind = domain.SourceFile
+	combined.SourceID = paths[0]
+	combined.SourceCount = len(paths)
 	return combined, nil
 }
 
@@ -119,6 +141,11 @@ func ReadCSV(r io.Reader, opts CSVOptions) (*domain.Dataset, error) {
 	if int64(len(data)) > limit {
 		return nil, &domain.InputTooLargeError{Limit: limit}
 	}
+	return ReadCSVBytes(data, opts)
+}
+
+// ReadCSVBytes parses already-read delimited text.
+func ReadCSVBytes(data []byte, opts CSVOptions) (*domain.Dataset, error) {
 	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, domain.ErrNoData
@@ -369,4 +396,20 @@ func uniqueName(raw string, position int, used map[string]int) string {
 			return candidate
 		}
 	}
+}
+
+// ReadInput reads a bounded input stream and reports the configured limit.
+func ReadInput(r io.Reader, maxBytes int64) ([]byte, error) {
+	limit := maxBytes
+	if limit <= 0 {
+		limit = defaultMaxBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, fmt.Errorf("read input: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, &domain.InputTooLargeError{Limit: limit}
+	}
+	return data, nil
 }

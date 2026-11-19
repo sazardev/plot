@@ -39,3 +39,15 @@ func TestUnknownLocaleFallsBackToEnglish(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "no data", loc.T("cli.error.no_data", nil))
 }
+
+func TestFormatIntUsesLocaleGrouping(t *testing.T) {
+	t.Parallel()
+
+	en, err := i18n.New("en")
+	require.NoError(t, err)
+	de, err := i18n.New("de")
+	require.NoError(t, err)
+
+	assert.Equal(t, "1,234", en.FormatInt(1234))
+	assert.Equal(t, "1.234", de.FormatInt(1234))
+}

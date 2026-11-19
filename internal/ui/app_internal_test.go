@@ -1,12 +1,15 @@
 package ui
 
 import (
+	"context"
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/help"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sazar/plot/internal/domain"
@@ -127,4 +130,71 @@ func TestTUIWarningsInStatusAndHelp(t *testing.T) {
 	model.showHelp = true
 	model.help.ShowAll = true
 	require.Contains(t, model.View(), "zero-valued")
+}
+
+func TestScrollLinesWindowsText(t *testing.T) {
+	t.Parallel()
+
+	text := strings.Join([]string{"a", "b", "c", "d", "e"}, "\n")
+	require.Equal(t, "a\nb", scrollLines(text, 0, 2))
+	require.Equal(t, "c\nd", scrollLines(text, 2, 2))
+	require.Equal(t, "d\ne", scrollLines(text, 99, 2))
+}
+
+func TestTUIHelpScrollKeysUpdateOffset(t *testing.T) {
+	t.Parallel()
+
+	model := internalModel(t, 80, 24)
+	for chartType, view := range model.views {
+		view.warnings = make([]domain.Warning, 40)
+		for i := range view.warnings {
+			view.warnings[i] = domain.Warning{ID: "cli.warn.ordinal_axis", Data: map[string]string{"Rows": "10"}}
+		}
+		model.views[chartType] = view
+	}
+	model.showHelp = true
+	model.help.ShowAll = true
+	require.Positive(t, model.maxHelpOffset())
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = updated.(Model)
+	require.Equal(t, 1, model.helpOffset)
+
+	for i := 0; i < 100; i++ {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+		model = updated.(Model)
+	}
+	require.Equal(t, model.maxHelpOffset(), model.helpOffset, "scrolling stops at the last page")
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model = updated.(Model)
+	require.Equal(t, model.maxHelpOffset()-1, model.helpOffset)
+
+	model.helpOffset = 0
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model = updated.(Model)
+	require.Equal(t, 0, model.helpOffset, "scrolling up at the top is a no-op")
+}
+
+func TestTUICommandPanicBecomesErrorPanel(t *testing.T) {
+	t.Parallel()
+
+	loc, err := i18n.New("en")
+	require.NoError(t, err)
+	model := New(Options{
+		Load: func(context.Context) (*domain.Dataset, error) {
+			panic("boom")
+		},
+		Build: func(*domain.Dataset, domain.ChartType, int, int) (*domain.RenderSpec, error) {
+			return nil, nil
+		},
+		Locale:   loc,
+		NoMotion: true,
+	})
+
+	msg := model.Init()()
+	loadErr, ok := msg.(loadErrMsg)
+	require.True(t, ok)
+	require.Error(t, loadErr.err)
+	require.Contains(t, loadErr.err.Error(), loc.T("tui.error.internal", nil))
 }

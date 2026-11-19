@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
+	"runtime/debug"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -26,7 +28,18 @@ var chartOrder = []domain.ChartType{
 }
 
 func (m Model) loadCmd() tea.Cmd {
-	return func() tea.Msg {
+	return func() (msg tea.Msg) {
+		// A panic in a loader/builder goroutine must not print a stack over the
+		// chart: recover here, log only to the debug file and show the error panel.
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				slog.Error("recovered load panic",
+					"panic", fmt.Sprint(recovered),
+					"stack", string(debug.Stack()),
+				)
+				msg = loadErrMsg{err: errors.New(m.opts.Locale.T("tui.error.internal", nil))}
+			}
+		}()
 		if m.opts.Load == nil || m.opts.Build == nil {
 			return loadErrMsg{err: errors.New("missing loader")}
 		}

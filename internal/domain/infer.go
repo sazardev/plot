@@ -347,14 +347,14 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 			continue
 		}
 		cell := ds.Rows[r][selection.labelIdx]
-		switch {
-		case cell.Kind == CellNumber:
+		switch cell.Kind {
+		case CellNumber:
 			labels[r] = SanitizeText(formatNumber(cell.Number))
 			xValues[r] = cell.Number
-		case cell.Kind == CellTime:
+		case CellTime:
 			labels[r] = SanitizeText(formatTime(cell.Time))
 			xValues[r] = float64(cell.Time.UnixNano()) / 1e9
-		case cell.Kind == CellNull:
+		case CellNull:
 			labels[r] = ""
 			xValues[r] = float64(r)
 		default:

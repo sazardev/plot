@@ -151,7 +151,7 @@ func pieLegend(spec *domain.RenderSpec, theme Theme, labelWidth, perLine int, pe
 		rows[line].put(x, theme.pieGlyph(slice.Marker), theme.seriesStyle(slice.ColorSlot))
 		label := clip(slice.Label, labelWidth, theme.ASCII)
 		rows[line].put(x+2, label, nil)
-		percentage := fmt.Sprintf("%5.1f%%", percents[i])
+		percentage := localizeDecimal(fmt.Sprintf("%5.1f%%", percents[i]), decimalSeparator(spec.Locale))
 		rows[line].put(x+2+labelWidth+1, percentage, theme.Muted)
 	}
 	return rows

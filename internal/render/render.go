@@ -168,24 +168,26 @@ type renderer struct {
 	plotW int
 	plotH int
 
-	axisY   int
-	xLabelY int
-	legendY int
-	yAxisW  int
-	yTicks  []yTick
-	yMin    float64
-	yMax    float64
-	xMin    float64
-	xMax    float64
-	canvas  *canvas
+	axisY      int
+	xLabelY    int
+	legendY    int
+	yAxisW     int
+	yTicks     []yTick
+	yMin       float64
+	yMax       float64
+	xMin       float64
+	xMax       float64
+	canvas     *canvas
+	decimalSep string
 }
 
 func newRenderer(spec *domain.RenderSpec, theme Theme) (*renderer, error) {
 	r := &renderer{
-		spec:   spec,
-		theme:  theme,
-		width:  spec.Width,
-		height: spec.Height,
+		spec:       spec,
+		theme:      theme,
+		width:      spec.Width,
+		height:     spec.Height,
+		decimalSep: decimalSeparator(spec.Locale),
 	}
 	titleRows := 0
 	if strings.TrimSpace(spec.Title) != "" {
@@ -335,7 +337,7 @@ func (r *renderer) buildYTicks() {
 		r.yTicks = append(r.yTicks, yTick{
 			row:   row,
 			value: value,
-			label: formatAxis(value, r.theme.ASCII),
+			label: formatAxis(value, r.theme.ASCII, r.decimalSep),
 		})
 	}
 }
@@ -672,7 +674,7 @@ func (r *renderer) drawXLabels() {
 		if r.spec.LabelKind == domain.LabelTime {
 			label = r.nearestTimeLabel(value)
 		} else {
-			label = formatAxis(value, r.theme.ASCII)
+			label = formatAxis(value, r.theme.ASCII, r.decimalSep)
 		}
 		label = clip(label, 12, r.theme.ASCII)
 		if label == "" {
@@ -797,12 +799,12 @@ func (r *renderer) segment(x0, y0, x1, y1 int, style StyleFunc, glyph string) {
 	}
 }
 
-func formatAxis(v float64, ascii bool) string {
+func formatAxis(v float64, ascii bool, decimalSep string) string {
 	if math.Abs(v) < 1e-12 {
 		return "0"
 	}
 	absValue := math.Abs(v)
-	factor := 1.0
+	var factor float64
 	suffix := ""
 	switch {
 	case absValue >= 1e12:
@@ -825,7 +827,7 @@ func formatAxis(v float64, ascii bool) string {
 		factor, suffix = 1e-12, "p"
 	}
 	scaled := v / factor
-	out := strconv.FormatFloat(scaled, 'g', 3, 64) + suffix
+	out := localizeDecimal(strconv.FormatFloat(scaled, 'g', 3, 64), decimalSep) + suffix
 	if ascii {
 		out = strings.ReplaceAll(out, "µ", "u")
 	}

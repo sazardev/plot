@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -25,7 +26,16 @@ func runTUI(
 	colorEnabled bool,
 	glyphMode domain.GlyphMode,
 	theme render.Theme,
-) error {
+	cache *storage.Cache,
+) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if stream.OutTTY {
+				_, _ = fmt.Fprint(stream.Out, "\x1b[?25h\x1b[?1049l")
+			}
+			panic(recovered)
+		}
+	}()
 	if len(args) == 0 && !databaseSourceConfigured(opts, stream.Env) {
 		return usageError("cli.error.no_input", nil)
 	}
@@ -36,15 +46,27 @@ func runTUI(
 	}
 
 	base := makeBuildOptions(opts, stream, colorMode, glyphMode, 80, 24)
+	var pending *pendingCache
 	load := func(_ context.Context) (*domain.Dataset, error) {
-		ds, _, _, err := loadDataset(args, opts, stream, delimiter, headerMode)
+		ds, _, _, write, err := loadDataset(args, opts, stream, delimiter, headerMode, cache)
 		if err != nil {
 			return nil, err
 		}
-		if err := domain.Infer(ds); err != nil {
-			return nil, err
-		}
+		pending = write
 		return ds, nil
+	}
+	// Cache writes run in a tea.Cmd after the loaded frame is scheduled, so a
+	// cold cache never delays the first frame (FR-13).
+	afterLoad := func() tea.Cmd {
+		write := pending
+		pending = nil
+		if write == nil {
+			return nil
+		}
+		return func() tea.Msg {
+			write.Save()
+			return nil
+		}
 	}
 	build := func(ds *domain.Dataset, chartType domain.ChartType, width, height int) (*domain.RenderSpec, error) {
 		options := base
@@ -64,11 +86,13 @@ func runTUI(
 		Title:       opts.Title,
 		NoMotion:    tuiNoMotion(opts, stream.Env),
 		Color:       colorEnabled,
+		OnLoaded:    afterLoad,
 	})
 
 	program := tea.NewProgram(
 		model,
 		tea.WithAltScreen(),
+		tea.WithoutCatchPanics(),
 		tea.WithInput(stream.In),
 		tea.WithOutput(stream.Out),
 	)

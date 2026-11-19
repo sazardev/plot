@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/sazar/plot/internal/i18n"
 )
@@ -29,10 +30,16 @@ type cliOptions struct {
 	Title      string
 	TUI        bool
 	NoMotion   bool
+	Config     string
 	DB         string
 	Query      string
 	QueryFile  string
 	Timeout    time.Duration
+	CacheDir   string
+	NoCache    bool
+	CacheTTL   time.Duration
+	CacheMax   int64
+	changed    map[string]bool
 }
 
 func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Command {
@@ -45,6 +52,10 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.LabelSet = cmd.Flags().Changed("label")
 			opts.ColumnsSet = cmd.Flags().Changed("columns")
+			opts.changed = make(map[string]bool)
+			cmd.Flags().Visit(func(flag *pflag.Flag) {
+				opts.changed[flag.Name] = true
+			})
 			return runApp(args, opts, stream, loc)
 		},
 	}
@@ -65,8 +76,11 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Flags().StringVar(&opts.Color, "color", "auto", loc.T("cli.flag.color", nil))
 	cmd.Flags().BoolVar(&opts.ASCII, "ascii", false, loc.T("cli.flag.ascii", nil))
 	cmd.Flags().StringVar(&opts.Title, "title", "", loc.T("cli.flag.title", nil))
+	cmd.Flags().StringVar(&opts.Config, "config", "", loc.T("cli.flag.config", nil))
 	cmd.Flags().BoolVar(&opts.TUI, "tui", false, loc.T("cli.flag.tui", nil))
 	cmd.Flags().BoolVar(&opts.NoMotion, "no-motion", false, loc.T("cli.flag.no_motion", nil))
+	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, loc.T("cli.flag.no_cache", nil))
+	cmd.Flags().StringVar(&opts.CacheDir, "cache-dir", "", loc.T("cli.flag.cache_dir", nil))
 	cmd.Flags().StringVar(&opts.DB, "db", "", loc.T("cli.flag.db", nil))
 	cmd.Flags().StringVar(&opts.Query, "query", "", loc.T("cli.flag.query", nil))
 	cmd.Flags().StringVar(&opts.QueryFile, "query-file", "", loc.T("cli.flag.query_file", nil))
@@ -77,7 +91,7 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Version = versionText()
 	cmd.SetVersionTemplate("{{.Name}} {{.Version}}\n")
 	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
-		fmt.Fprint(c.OutOrStdout(), helpText(c, loc))
+		_, _ = fmt.Fprint(c.OutOrStdout(), helpText(c, loc))
 	})
 	return cmd
 }
