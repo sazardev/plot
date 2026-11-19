@@ -223,6 +223,16 @@
             </div>
           </div>
 
+          <div class="pg-controls" data-pg-controls hidden>
+            <label class="pg-control">Label
+              <select data-pg-label></select>
+            </label>
+            <div class="pg-series-wrap">
+              <span>Series</span>
+              <div class="pg-series" data-pg-series></div>
+            </div>
+          </div>
+
           <div class="pg-chart">
             <canvas data-pg-canvas aria-label="Playground chart" role="img"></canvas>
             <div class="pg-empty" data-pg-empty>
@@ -232,7 +242,7 @@
             </div>
           </div>
 
-          <div class="pg-preview" data-pg-preview hidden></div>
+          <div class="pg-preview" data-pg-preview role="region" aria-label="Data preview" tabindex="0" hidden></div>
 
           <div class="pg-out-foot">
             <span data-pg-meta>Waiting for data</span>
@@ -282,7 +292,7 @@
 
       <div class="code-block" style="margin-top: 1.2rem;">
         <button class="copy" type="button">Copy</button>
-        <pre><code><span class="comment"># query → chart, no intermediate file</span>
+        <pre tabindex="0"><code><span class="comment"># query → chart, no intermediate file</span>
 psql --csv -c "select day, signups from metrics order by day" | pl
 
 <span class="comment"># or point pl at a CSV</span>
@@ -437,14 +447,14 @@ pl sales.csv --type bar --title "Revenue by month"</code></pre>
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code><span class="prompt">$</span> go install github.com/sazardev/plot/cmd/pl@latest</code></pre>
+              <pre tabindex="0"><code><span class="prompt">$</span> go install github.com/sazardev/plot/cmd/pl@latest</code></pre>
             </div>
             <p>
               Make sure <code>$(go env GOPATH)/bin</code> is on your <code>PATH</code>. From a clone, build it yourself:
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code>git clone https://github.com/sazardev/plot.git
+              <pre tabindex="0"><code>git clone https://github.com/sazardev/plot.git
 cd plot
 CGO_ENABLED=0 go build -o pl ./cmd/pl</code></pre>
             </div>
@@ -458,7 +468,7 @@ CGO_ENABLED=0 go build -o pl ./cmd/pl</code></pre>
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code><span class="comment"># stdin</span>
+              <pre tabindex="0"><code><span class="comment"># stdin</span>
 printf 'day,signups\nMon,3\nTue,5\nWed,4\n' | pl
 
 <span class="comment"># one or more files</span>
@@ -481,7 +491,7 @@ psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
               The CLI is intentionally small: delimited text on stdin or files, plus read-only SQLite.
               The browser playground on this page accepts a wider set of exports and normalizes them for a chart.
             </p>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0">
               <table>
                 <thead>
                   <tr><th>Where</th><th>Accepts</th><th>Notes</th></tr>
@@ -501,7 +511,7 @@ psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
           <article class="doc-block" id="charts-guide">
             <h3>Chart types</h3>
             <p>Four families, one renderer, the same input pipeline:</p>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0">
               <table>
                 <thead>
                   <tr><th>Type</th><th>Use it for</th><th>Notes</th></tr>
@@ -521,7 +531,7 @@ psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
             <p>Pick columns, rename labels, sort, filter and title the chart without touching the source data.</p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code><span class="comment"># explicit columns and order</span>
+              <pre tabindex="0"><code><span class="comment"># explicit columns and order</span>
 pl sales.csv --label month --columns revenue,cost --type line
 
 <span class="comment"># sort and filter before rendering</span>
@@ -543,7 +553,7 @@ pl sales.csv --ascii --width 72 --height 20</code></pre>
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code>pl --db metrics.db --query 'select day, signups from metrics order by day'
+              <pre tabindex="0"><code>pl --db metrics.db --query 'select day, signups from metrics order by day'
 pl --db metrics.db --query-file queries/signups.sql --timeout 5s
 
 <span class="comment"># environment variables also work</span>
@@ -559,7 +569,7 @@ PL_DB=metrics.db PL_QUERY='select * from weekly' pl</code></pre>
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code>pl --tui sales.csv
+              <pre tabindex="0"><code>pl --tui sales.csv
 pl --tui --no-motion sales.csv   <span class="comment"># static first frame</span></code></pre>
             </div>
             <div class="key-grid">
@@ -581,7 +591,7 @@ pl --tui --no-motion sales.csv   <span class="comment"># static first frame</spa
             </p>
             <div class="code-block">
               <button class="copy" type="button">Copy</button>
-              <pre><code>[database]
+              <pre tabindex="0"><code>[database]
 path = "metrics.db"
 query = "select day, signups from metrics order by day"
 timeout = "10s"
@@ -606,7 +616,7 @@ max_size = "64MiB"</code></pre>
 
           <article class="doc-block" id="flags">
             <h3>Flags</h3>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0">
               <table>
                 <thead>
                   <tr><th>Flag</th><th>What it does</th><th>Default</th></tr>
@@ -648,7 +658,7 @@ max_size = "64MiB"</code></pre>
 
           <article class="doc-block" id="environment">
             <h3>Environment</h3>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0">
               <table>
                 <thead>
                   <tr><th>Variable</th><th>Effect</th></tr>
@@ -667,7 +677,7 @@ max_size = "64MiB"</code></pre>
 
           <article class="doc-block" id="exit-codes">
             <h3>Exit codes</h3>
-            <div class="table-wrap">
+            <div class="table-wrap" tabindex="0">
               <table>
                 <thead>
                   <tr><th>Code</th><th>Meaning</th></tr>

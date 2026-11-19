@@ -29,6 +29,9 @@
     sqlQuery: $("[data-pg-query]"),
     download: $('[data-pg-action="download"]'),
     copyCommand: $('[data-pg-action="copy-command"]'),
+    controls: $("[data-pg-controls]"),
+    label: $("[data-pg-label]"),
+    series: $("[data-pg-series]"),
   };
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -38,6 +41,8 @@
   }
   let table = null;
   let chart = null;
+  let labelIndex = -1;
+  let selectedSeries = new Set();
   let workbook = null;
   let workbookName = "";
   let sqlDb = null;
@@ -363,12 +368,60 @@
     return base.charAt(0).toUpperCase() + base.slice(1);
   };
 
-  const countNumeric = (tableData) => tableData.numeric.filter(Boolean).length;
-
   const selectChartColumns = (tableData) => {
     const label = tableData.columns.findIndex((_, index) => !tableData.numeric[index] && tableData.rows.some((row) => row[index] !== null));
     const values = tableData.numeric.map((isNumeric, index) => (isNumeric ? index : -1)).filter((index) => index >= 0);
     return { label, values };
+  };
+
+  const selectedValues = () => {
+    if (!table) return [];
+    return table.numeric
+      .map((isNumeric, index) => (isNumeric && selectedSeries.has(index) ? index : -1))
+      .filter((index) => index >= 0);
+  };
+
+  const colorIndex = (columnIndex) => {
+    if (!table) return 0;
+    const order = table.numeric.map((isNumeric, index) => (isNumeric ? index : -1)).filter((index) => index >= 0);
+    const position = order.indexOf(columnIndex);
+    return position >= 0 ? position : 0;
+  };
+
+  const renderControls = () => {
+    if (!table) {
+      els.controls.hidden = true;
+      return;
+    }
+    els.controls.hidden = false;
+    els.label.textContent = "";
+    const rowOption = document.createElement("option");
+    rowOption.value = "-1";
+    rowOption.textContent = "Row number";
+    els.label.appendChild(rowOption);
+    table.columns.forEach((column, index) => {
+      if (table.numeric[index]) return;
+      if (!table.rows.some((row) => row[index] !== null)) return;
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = column;
+      els.label.appendChild(option);
+    });
+    els.label.value = String(labelIndex);
+
+    els.series.textContent = "";
+    table.numeric.forEach((isNumeric, index) => {
+      if (!isNumeric) return;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pg-chip";
+      button.dataset.seriesIndex = String(index);
+      button.style.setProperty("--chip-color", COLORS[colorIndex(index) % COLORS.length]);
+      button.textContent = table.columns[index];
+      button.setAttribute("aria-pressed", String(selectedSeries.has(index)));
+      button.classList.toggle("is-active", selectedSeries.has(index));
+      els.series.appendChild(button);
+    });
   };
 
   const formatNumber = (value) => {
@@ -399,12 +452,16 @@
       chart.destroy();
       chart = null;
     }
+    const defaults = selectChartColumns(next);
+    labelIndex = defaults.label;
+    selectedSeries = new Set(defaults.values);
     els.title.textContent = next.title;
     const truncated = next.truncated ? ` · showing first ${MAX_ROWS.toLocaleString("en")}` : "";
     els.meta.textContent = `${next.rows.length.toLocaleString("en")} rows × ${next.columns.length.toLocaleString("en")} columns · ${next.source}${truncated}`;
     els.download.disabled = false;
     els.copyCommand.disabled = false;
     setStatus(status, "ok");
+    renderControls();
     renderPreview();
     drawChart();
   };
@@ -466,20 +523,20 @@
       showEmpty("Chart.js is still loading", "Give it a second and try again.");
       return;
     }
-    const { label, values } = selectChartColumns(table);
+    const values = selectedValues();
     if (!values.length) {
-      showEmpty("No numeric series", "Add a column with numbers to plot.");
+      showEmpty("No numeric series", "Select at least one numeric series.");
       return;
     }
 
     const type = chartType();
     const labels = table.rows.map((row, index) => {
-      const value = label >= 0 ? row[label] : index + 1;
+      const value = labelIndex >= 0 ? row[labelIndex] : index + 1;
       return value === null ? `#${index + 1}` : displayCell(value);
     });
 
     if (type === "bar" || type === "pie" || type === "donut") {
-      if (label < 0) {
+      if (labelIndex < 0) {
         setStatus("No label column detected; using row numbers.", "ok");
       }
     }
@@ -499,8 +556,8 @@
         {
           label: table.columns[index],
           data,
-          backgroundColor: COLORS[0],
-          borderColor: COLORS[0],
+          backgroundColor: COLORS[colorIndex(index) % COLORS.length],
+          borderColor: COLORS[colorIndex(index) % COLORS.length],
           borderWidth: 0,
           borderRadius: 4,
           maxBarThickness: 24,
@@ -538,12 +595,12 @@
     if (values.length > 8) {
       setStatus(`Line shows the first 8 numeric series of ${values.length}.`, "ok");
     }
-    const series = values.slice(0, 8).map((index, order) => ({
+    const series = values.slice(0, 8).map((index) => ({
       label: table.columns[index],
       data: table.rows.map((row) => (typeof row[index] === "number" ? row[index] : null)),
-      borderColor: COLORS[order % COLORS.length],
-      backgroundColor: hexAlpha(COLORS[order % COLORS.length], 0.14),
-      pointBackgroundColor: COLORS[order % COLORS.length],
+      borderColor: COLORS[colorIndex(index) % COLORS.length],
+      backgroundColor: hexAlpha(COLORS[colorIndex(index) % COLORS.length], 0.14),
+      pointBackgroundColor: COLORS[colorIndex(index) % COLORS.length],
       borderWidth: 2,
       pointRadius: table.rows.length > 80 ? 0 : 3,
       pointHoverRadius: 5,
@@ -966,6 +1023,29 @@
       setActive("[data-pg-chart]", button);
       drawChart();
     });
+  });
+
+  els.label.addEventListener("change", () => {
+    labelIndex = Number(els.label.value);
+    drawChart();
+  });
+
+  els.series.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-series-index]");
+    if (!button) return;
+    const index = Number(button.dataset.seriesIndex);
+    if (selectedSeries.has(index)) {
+      if (selectedSeries.size === 1) {
+        setStatus("Keep at least one series selected.", "error");
+        return;
+      }
+      selectedSeries.delete(index);
+    } else {
+      selectedSeries.add(index);
+    }
+    button.classList.toggle("is-active", selectedSeries.has(index));
+    button.setAttribute("aria-pressed", String(selectedSeries.has(index)));
+    drawChart();
   });
 
   $$("[data-pg-action]").forEach((button) => {
