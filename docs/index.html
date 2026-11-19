@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pl — beautiful charts in your terminal</title>
-  <meta name="description" content="pl turns pipes, CSVs and SQLite queries into clean terminal charts in milliseconds. One static Go binary. Line, bar, pie and donut charts, plus an optional TUI.">
+  <meta name="description" content="pl turns pipes, CSVs and SQLite queries into clean terminal charts in milliseconds. Paste CSV, Markdown, JSON, SQL, Excel or SQLite into the browser playground. One static Go binary with an optional TUI.">
   <meta name="theme-color" content="#f2f0e9">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0d0a">
   <link rel="canonical" href="https://sazardev.github.io/plot/">
@@ -57,6 +57,7 @@
       </button>
 
       <nav class="nav-links" id="site-nav" aria-label="Primary navigation" data-nav>
+        <a href="#playground">Playground</a>
         <a href="#why">Why pl</a>
         <a href="#charts">Charts</a>
         <a href="#demo">Demo</a>
@@ -77,8 +78,8 @@
         </p>
 
         <div class="hero-actions">
-          <a class="button button-primary" href="#docs">
-            Read the guide
+          <a class="button button-primary" href="#playground">
+            Try the playground
             <span aria-hidden="true">↓</span>
           </a>
           <a class="button button-ghost" href="#demo">
@@ -129,6 +130,125 @@
         <span class="tag">ASCII</span>
       </div>
     </div>
+
+    <section class="wrap section playground-section" id="playground" aria-labelledby="playground-title">
+      <div class="section-head">
+        <div>
+          <span class="kicker">00 — Try it here</span>
+          <h2 id="playground-title">Paste it. Drop it. Plot it.</h2>
+        </div>
+        <p>
+          A browser-side sandbox for the same tables you would feed <code>pl</code>:
+          CSV, TSV, Markdown, JSON, SQL, Excel and SQLite. Nothing leaves your machine.
+        </p>
+      </div>
+
+      <div class="playground" data-pg>
+        <div class="pg-input">
+          <div class="pg-head">
+            <span class="pg-step">01 · Input</span>
+            <div class="pg-tabs" role="tablist" aria-label="Input mode">
+              <button class="is-active" type="button" role="tab" aria-selected="true" data-pg-tab="paste">Paste</button>
+              <button type="button" role="tab" aria-selected="false" data-pg-tab="file">Upload</button>
+            </div>
+          </div>
+
+          <div data-pg-pane="paste">
+            <textarea class="pg-textarea" data-pg-text spellcheck="false" aria-label="Paste tabular data">| month | revenue | cost |
+| --- | ---: | ---: |
+| Jan | 42000 | 21000 |
+| Feb | 48500 | 23800 |
+| Mar | 53200 | 25600 |
+| Apr | 50100 | 24900 |
+| May | 61800 | 29100 |
+| Jun | 67400 | 31200 |
+| Jul | 72100 | 33800 |
+| Aug | 69800 | 32700 |
+| Sep | 78600 | 36100 |
+| Oct | 84200 | 38900 |
+| Nov | 91500 | 41800 |
+| Dec | 98700 | 44700 |</textarea>
+            <div class="pg-hint-row">
+              <span>CSV · TSV · Markdown · JSON · SQL result · Excel copy</span>
+              <button type="button" class="pg-link" data-pg-action="clipboard">Paste clipboard</button>
+            </div>
+          </div>
+
+          <div data-pg-pane="file" hidden>
+            <label class="dropzone" for="pg-file" data-pg-drop>
+              <input class="sr-only" type="file" id="pg-file" data-pg-file accept=".csv,.tsv,.txt,.md,.markdown,.json,.sql,.xlsx,.xls,.db,.sqlite,.sqlite3">
+              <span class="drop-icon" aria-hidden="true">⇪</span>
+              <strong>Drop a file or click to browse</strong>
+              <span>CSV · TSV · Markdown · JSON · SQL · XLSX · SQLite</span>
+            </label>
+            <div class="pg-file-tools">
+              <span data-pg-file-name>No file selected</span>
+              <label class="pg-select" data-pg-sheet-wrap hidden>Sheet
+                <select data-pg-sheet></select>
+              </label>
+            </div>
+          </div>
+
+          <div class="pg-actions">
+            <button type="button" class="pg-button" data-pg-action="sample">Load sample</button>
+            <button type="button" class="pg-button is-primary" data-pg-action="render">Render chart <span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="pg-sql" data-pg-sql hidden>
+            <div class="pg-sql-bar">
+              <span>SQLite · local</span>
+              <select data-pg-table aria-label="SQLite table"></select>
+            </div>
+            <textarea data-pg-query spellcheck="false" aria-label="SQLite query">SELECT * FROM data LIMIT 500;</textarea>
+            <div class="pg-sql-actions">
+              <button type="button" class="pg-button is-small" data-pg-action="run-sql">Run query</button>
+              <span>Executed with sql.js in this tab.</span>
+            </div>
+          </div>
+
+          <p class="pg-status" data-pg-status role="status"></p>
+        </div>
+
+        <div class="pg-output">
+          <div class="pg-out-head">
+            <div>
+              <span class="pg-step">02 · Chart</span>
+              <strong data-pg-title>Revenue by month</strong>
+            </div>
+            <div class="pg-chart-tabs" role="group" aria-label="Chart type">
+              <button class="is-active" type="button" data-pg-chart="line">Line</button>
+              <button type="button" data-pg-chart="bar">Bar</button>
+              <button type="button" data-pg-chart="donut">Donut</button>
+              <button type="button" data-pg-chart="pie">Pie</button>
+            </div>
+          </div>
+
+          <div class="pg-chart">
+            <canvas data-pg-canvas aria-label="Playground chart" role="img"></canvas>
+            <div class="pg-empty" data-pg-empty>
+              <span aria-hidden="true">◔</span>
+              <strong>Your chart lands here</strong>
+              <p>Paste a table or drop a file to start.</p>
+            </div>
+          </div>
+
+          <div class="pg-preview" data-pg-preview hidden></div>
+
+          <div class="pg-out-foot">
+            <span data-pg-meta>Waiting for data</span>
+            <div class="pg-out-actions">
+              <button type="button" class="pg-link" data-pg-action="download" disabled>Download CSV</button>
+              <button type="button" class="pg-link" data-pg-action="copy-command" disabled>Copy pl command</button>
+            </div>
+          </div>
+
+          <p class="pg-note">
+            SQLite and Excel are parsed locally. For PostgreSQL, MySQL or another server, paste the query result here,
+            or run psql --csv into pl in your terminal. A static page cannot open a server connection.
+          </p>
+        </div>
+      </div>
+    </section>
 
     <section class="wrap section" id="why" aria-labelledby="why-title">
       <div class="section-head">
@@ -298,6 +418,7 @@ pl sales.csv --type bar --title "Revenue by month"</code></pre>
           <p>On this page</p>
           <a href="#install">Install</a>
           <a href="#quickstart">Quick start</a>
+          <a href="#formats">Formats</a>
           <a href="#charts-guide">Chart types</a>
           <a href="#examples">Examples</a>
           <a href="#sqlite">SQLite</a>
@@ -353,6 +474,30 @@ psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
             </div>
           </article>
 
+
+          <article class="doc-block" id="formats">
+            <h3>Formats</h3>
+            <p>
+              The CLI is intentionally small: delimited text on stdin or files, plus read-only SQLite.
+              The browser playground on this page accepts a wider set of exports and normalizes them for a chart.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Where</th><th>Accepts</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>CLI</td><td>stdin, CSV/TSV/delimited files, SQLite</td><td>Multiple files with matching headers are concatenated.</td></tr>
+                  <tr><td><a href="#playground">Playground</a></td><td>CSV, TSV, Markdown tables, JSON, SQL dumps, SQLite, XLSX/XLS, clipboard</td><td>Parsed in your browser; Excel and SQLite stay local.</td></tr>
+                  <tr><td>PostgreSQL, MySQL, etc.</td><td>Paste the query result or a SQLite-compatible dump</td><td>Or use <code>psql --csv -c "..." | pl</code> in a terminal.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="callout">
+              The playground can download a normalized CSV. Copy the generated <code>pl pl-playground.csv</code>
+              command to reproduce the same data in your terminal.
+            </p>
+          </article>
           <article class="doc-block" id="charts-guide">
             <h3>Chart types</h3>
             <p>Four families, one renderer, the same input pipeline:</p>
@@ -570,6 +715,7 @@ max_size = "64MiB"</code></pre>
           <p>A fast, local-first data plotter for people who already live in a shell.</p>
         </div>
         <nav class="footer-links" aria-label="Footer navigation">
+          <a href="#playground">Playground</a>
           <a href="#docs">Guide</a>
           <a href="#flags">Flags</a>
           <a href="https://github.com/sazardev/plot">GitHub</a>
@@ -584,6 +730,8 @@ max_size = "64MiB"</code></pre>
     </div>
   </footer>
 
+  <script src="assets/vendor/chart.umd.js" defer></script>
+  <script src="assets/playground.js" defer></script>
   <script src="assets/site.js" defer></script>
 </body>
 </html>

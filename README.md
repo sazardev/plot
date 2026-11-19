@@ -5,7 +5,7 @@
 `pl` turns pipes, CSVs and SQLite queries into line, bar, pie and donut charts in milliseconds.
 It is a single static Go binary with an optional Bubble Tea TUI, a local parsed-dataset cache and no network access.
 
-[Website](https://sazardev.github.io/plot/) · [Usage guide](https://sazardev.github.io/plot/#docs) · [Issues](https://github.com/sazardev/plot/issues)
+[Website](https://sazardev.github.io/plot/) · [Playground](https://sazardev.github.io/plot/#playground) · [Usage guide](https://sazardev.github.io/plot/#docs) · [Issues](https://github.com/sazardev/plot/issues)
 
 ![pl TUI showing a multi-series line chart](docs/assets/tui.png)
 
@@ -59,6 +59,7 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 - Localized messages and locale-aware number formatting.
 - A disposable SQLite cache with content-addressed keys, TTL, LRU eviction and user-only permissions.
 - Strict TOML configuration with flags > environment > config > default precedence.
+- A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with CSV download.
 
 ## Documentation
 

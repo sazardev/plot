@@ -57,6 +57,7 @@ db/queries/         one .sql file per aggregate (cache queries)
 sqlc.yaml           sqlite engine, schema, queries, generated package
 testdata/           sample inputs; render and TUI goldens live in internal/*/testdata
 docs/               static product site served by GitHub Pages
+docs/assets/vendor/ browser-only Chart.js, SheetJS, sql.js and licenses
 README.md           public README and install guide
 LICENSE             MIT license
 .github/workflows/  CI: lint, test, build (future)
