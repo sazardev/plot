@@ -34,6 +34,7 @@ Read the code around a change before writing: `cmd/pl` is the entry point, `inte
 | New migration | `goose -dir db/migrations create <name> sql` |
 | Apply migrations | `goose -dir db/migrations up` |
 | Install git hooks | `lefthook install` |
+| Serve the site | `python3 -m http.server -d docs 8765` |
 | Release dry run | `goreleaser release --snapshot --clean` |
 
 `TODO:` the Makefile/scripts do not exist yet; once added, prefer its targets (`make test`, `make lint`) over the raw commands above and update this table. The goose dialect is `sqlite3`; the runtime cache path is `--cache-dir` > `PL_CACHE_DIR` > `cache.dir` > `os.UserCacheDir()/pl`.
@@ -55,6 +56,9 @@ db/migrations/      forward-only goose SQL migrations (schema sqlc reads)
 db/queries/         one .sql file per aggregate (cache queries)
 sqlc.yaml           sqlite engine, schema, queries, generated package
 testdata/           sample inputs; render and TUI goldens live in internal/*/testdata
+docs/               static product site served by GitHub Pages
+README.md           public README and install guide
+LICENSE             MIT license
 .github/workflows/  CI: lint, test, build (future)
 ```
 

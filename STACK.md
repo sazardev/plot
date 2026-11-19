@@ -50,6 +50,7 @@ db/migrations/                    forward-only goose SQL migrations (schema sqlc
 db/queries/                       one .sql file per aggregate (cache queries)
 sqlc.yaml                         sqlite engine, schema, queries, output package
 testdata/                         sample inputs; render/TUI goldens live in internal/*/testdata
+docs/                             static product site and assets, served by GitHub Pages
 ```
 
 Dependency direction: `cmd → ui → render → domain` and `cmd → storage → domain`; `cmd → config` and
@@ -122,6 +123,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 | Release dry run | `goreleaser release --snapshot --clean` |
 | Coverage | `go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out` |
 | Install hooks | `lefthook install` |
+| Serve the site | `python3 -m http.server -d docs 8765` |
 
 ## Testing
 

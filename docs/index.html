@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pl — beautiful charts in your terminal</title>
+  <meta name="description" content="pl turns pipes, CSVs and SQLite queries into clean terminal charts in milliseconds. One static Go binary. Line, bar, pie and donut charts, plus an optional TUI.">
+  <meta name="theme-color" content="#f2f0e9">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0d0a">
+  <link rel="canonical" href="https://sazardev.github.io/plot/">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/Geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/site.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="pl — beautiful charts in your terminal">
+  <meta property="og:description" content="Pipe a CSV, a SQL result or a file into pl and get a clean terminal chart in milliseconds.">
+  <meta property="og:url" content="https://sazardev.github.io/plot/">
+  <meta property="og:image" content="https://sazardev.github.io/plot/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script>document.documentElement.classList.add('js')</script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "pl",
+      "operatingSystem": "Linux, macOS, Windows",
+      "applicationCategory": "DeveloperApplication",
+      "description": "A fast terminal data plotter with line, bar, pie and donut charts, an optional TUI and read-only SQLite input.",
+      "url": "https://sazardev.github.io/plot/",
+      "codeRepository": "https://github.com/sazardev/plot",
+      "programmingLanguage": "Go",
+      "license": "https://github.com/sazardev/plot/blob/main/LICENSE"
+    }
+  </script>
+</head>
+<body id="top">
+  <div class="bg-grid" aria-hidden="true"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <div class="wrap nav-shell">
+      <a class="brand" href="#top" aria-label="pl home">
+        <span class="brand-mark">pl</span>
+        <span class="brand-meta">
+          <strong>plot</strong>
+          <small>terminal charts</small>
+        </span>
+      </a>
+
+      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav class="nav-links" id="site-nav" aria-label="Primary navigation" data-nav>
+        <a href="#why">Why pl</a>
+        <a href="#charts">Charts</a>
+        <a href="#demo">Demo</a>
+        <a href="#docs">Docs</a>
+        <a class="nav-cta" href="https://github.com/sazardev/plot">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="wrap hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Terminal-native data viz</p>
+        <h1 id="hero-title">Make data <em>visible</em> without leaving the terminal.</h1>
+        <p class="hero-lede">
+          <strong>pl</strong> turns pipes, CSVs and SQLite queries into clean charts in milliseconds.
+          One static binary, four chart types, no browser or notebook in the loop.
+        </p>
+
+        <div class="hero-actions">
+          <a class="button button-primary" href="#docs">
+            Read the guide
+            <span aria-hidden="true">↓</span>
+          </a>
+          <a class="button button-ghost" href="#demo">
+            <span class="play-icon" aria-hidden="true">▶</span>
+            Watch the demo
+          </a>
+        </div>
+
+        <div class="install-pill">
+          <code>go install github.com/sazardev/plot/cmd/pl@latest</code>
+          <button class="copy" type="button" data-copy-text="go install github.com/sazardev/plot/cmd/pl@latest">Copy</button>
+        </div>
+
+        <ul class="hero-stats">
+          <li><strong>26 ms</strong><span>warm 10k render</span></li>
+          <li><strong>4</strong><span>chart types</span></li>
+          <li><strong>1</strong><span>static binary</span></li>
+          <li><strong>0</strong><span>network calls</span></li>
+        </ul>
+      </div>
+
+      <figure class="hero-shot reveal">
+        <div class="terminal">
+          <div class="terminal-bar" aria-hidden="true">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span>pl --tui traffic.csv</span>
+            <span>80×24</span>
+          </div>
+          <img src="assets/tui.png" width="1400" height="900" alt="pl interactive TUI showing a multi-series line chart for organic, paid and referral traffic" fetchpriority="high">
+        </div>
+        <figcaption>
+          <span>TUI · line chart · 3 series</span>
+          <span>tab to switch charts</span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <div class="wrap">
+      <div class="tag-row" aria-label="Supported inputs and environments">
+        <span>Works with</span>
+        <span class="tag">stdin</span>
+        <span class="tag">CSV</span>
+        <span class="tag">SQLite</span>
+        <span class="tag">Linux</span>
+        <span class="tag">macOS</span>
+        <span class="tag">Windows Terminal</span>
+        <span class="tag">NO_COLOR</span>
+        <span class="tag">ASCII</span>
+      </div>
+    </div>
+
+    <section class="wrap section" id="why" aria-labelledby="why-title">
+      <div class="section-head">
+        <div>
+          <span class="kicker">01 — The workflow</span>
+          <h2 id="why-title">From pipe to plot in one line.</h2>
+        </div>
+        <p>
+          No dashboard to configure, no CSV to upload, no chart library to learn.
+          If the data can reach your terminal, <code>pl</code> can draw it.
+        </p>
+      </div>
+
+      <div class="steps">
+        <article class="step reveal">
+          <span class="step-num">01</span>
+          <h3>Pipe it in</h3>
+          <p><code>psql --csv</code>, <code>mysql --batch</code>, <code>cat file.csv</code> or a plain file path. Anything tabular works.</p>
+        </article>
+        <article class="step reveal">
+          <span class="step-num">02</span>
+          <h3>Let pl infer</h3>
+          <p>Headers, numeric columns, time values, nulls and the best default chart. Override anything with a flag.</p>
+        </article>
+        <article class="step reveal">
+          <span class="step-num">03</span>
+          <h3>Read the chart</h3>
+          <p>A sharp ANSI chart on stdout. Add <code>--tui</code> when you want to explore chart types interactively.</p>
+        </article>
+      </div>
+
+      <div class="code-block" style="margin-top: 1.2rem;">
+        <button class="copy" type="button">Copy</button>
+        <pre><code><span class="comment"># query → chart, no intermediate file</span>
+psql --csv -c "select day, signups from metrics order by day" | pl
+
+<span class="comment"># or point pl at a CSV</span>
+pl sales.csv --type bar --title "Revenue by month"</code></pre>
+      </div>
+    </section>
+
+    <section class="wrap section" aria-labelledby="features-title">
+      <div class="section-head">
+        <div>
+          <span class="kicker">02 — Small on purpose</span>
+          <h2 id="features-title">A focused tool that feels finished.</h2>
+        </div>
+        <p>
+          Everything you need to inspect data in a terminal, and nothing that gets between you and the chart.
+        </p>
+      </div>
+
+      <div class="features">
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 3 5-6"/></svg></div>
+          <h3>Four charts, zero config</h3>
+          <p>Line and bar charts are chosen automatically. Pie and donut are one flag away. Braille lines keep small charts readable.</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></div>
+          <h3>SQLite is a first-class input</h3>
+          <p>Run a read-only query with <code>--db</code> and <code>--query</code>. Timeouts, verbatim driver errors and no accidental writes.</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg></div>
+          <h3>A TUI when you want one</h3>
+          <p>Press <code>--tui</code> for a framed, animated view. Cycle charts with tab, open help with <code>?</code>, quit with <code>q</code>.</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5v6a4 4 0 0 0 4 4h12"/><path d="m16 11 4 4-4 4"/></svg></div>
+          <h3>Built for pipes</h3>
+          <p>stdout carries only the chart. Warnings go to stderr, broken pipes exit quietly, and every failure has a documented exit code.</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></div>
+          <h3>Fast by default</h3>
+          <p>A cold 10,000-row render lands around 30 ms here. Parsed datasets are cached for warm renders without changing output.</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 2.9 8.4 7 10 4.1-1.6 7-5.6 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>Private and local</h3>
+          <p>No network egress, no telemetry. The cache lives in your user cache directory with user-only permissions.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="wrap section" id="charts" aria-labelledby="charts-title">
+      <div class="section-head">
+        <div>
+          <span class="kicker">03 — The chart shelf</span>
+          <h2 id="charts-title">The whole chart shelf.</h2>
+        </div>
+        <p>
+          Real output from the current binary, captured with color and Unicode glyphs at a normal terminal size.
+        </p>
+      </div>
+
+      <div class="gallery">
+        <figure class="shot reveal">
+          <div class="shot-media">
+            <img src="assets/bar.png" width="1800" height="1217" alt="pl bar chart showing monthly revenue from January to December">
+          </div>
+          <figcaption><strong>Bar chart · revenue by month</strong><span>--type bar</span></figcaption>
+        </figure>
+
+        <figure class="shot reveal">
+          <div class="shot-media">
+            <img src="assets/line.png" width="1800" height="1245" alt="pl line chart with organic, paid and referral traffic over a week">
+          </div>
+          <figcaption><strong>Line chart · three series</strong><span>--type line</span></figcaption>
+        </figure>
+
+        <figure class="shot reveal">
+          <div class="shot-media">
+            <img src="assets/donut.png" width="1400" height="1226" alt="pl donut chart showing sessions by channel with a percentage legend">
+          </div>
+          <figcaption><strong>Donut · sessions by channel</strong><span>--type donut</span></figcaption>
+        </figure>
+
+        <figure class="shot reveal">
+          <div class="shot-media">
+            <img src="assets/sqlite.png" width="1800" height="1245" alt="pl line chart reading weekly signups from a SQLite database">
+          </div>
+          <figcaption><strong>SQLite · weekly signups</strong><span>--db metrics.db</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <section class="dark-band reveal" id="demo" aria-labelledby="demo-title">
+        <div class="video-head">
+          <div>
+            <span class="kicker">04 — See it move</span>
+            <h2 id="demo-title">Watch a pipe become a plot.</h2>
+          </div>
+          <p>
+            Twenty-four seconds of the real binary: bar, line, donut and the interactive TUI.
+          </p>
+        </div>
+
+        <div class="video-frame">
+          <video controls muted autoplay loop playsinline preload="metadata" poster="assets/demo-poster.png" aria-label="Demo of pl rendering terminal charts and its TUI">
+            <source src="assets/demo.mp4" type="video/mp4">
+            Your browser does not support the video tag. <a href="assets/demo.mp4">Download the demo</a>.
+          </video>
+        </div>
+        <div class="video-note">
+          <span>Recorded with the real binary · no mockups</span>
+          <span>24 sec · 1400×760 · sound off</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="wrap section" id="docs" aria-labelledby="docs-title">
+      <div class="section-head">
+        <div>
+          <span class="kicker">05 — The manual</span>
+          <h2 id="docs-title">A small tool with a short manual.</h2>
+        </div>
+        <p>
+          Install it, pipe something into it, and reach for a flag only when you want to override the defaults.
+        </p>
+      </div>
+
+      <div class="docs-layout">
+        <aside class="docs-nav" aria-label="Documentation sections">
+          <p>On this page</p>
+          <a href="#install">Install</a>
+          <a href="#quickstart">Quick start</a>
+          <a href="#charts-guide">Chart types</a>
+          <a href="#examples">Examples</a>
+          <a href="#sqlite">SQLite</a>
+          <a href="#tui">TUI</a>
+          <a href="#config">Config</a>
+          <a href="#flags">Flags</a>
+          <a href="#environment">Environment</a>
+          <a href="#exit-codes">Exit codes</a>
+        </aside>
+
+        <div>
+          <article class="doc-block" id="install">
+            <h3>Install</h3>
+            <p>
+              You need Go 1.26 or newer. The binary is pure Go and builds with <code>CGO_ENABLED=0</code>.
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code><span class="prompt">$</span> go install github.com/sazardev/plot/cmd/pl@latest</code></pre>
+            </div>
+            <p>
+              Make sure <code>$(go env GOPATH)/bin</code> is on your <code>PATH</code>. From a clone, build it yourself:
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code>git clone https://github.com/sazardev/plot.git
+cd plot
+CGO_ENABLED=0 go build -o pl ./cmd/pl</code></pre>
+            </div>
+          </article>
+
+          <article class="doc-block" id="quickstart">
+            <h3>Quick start</h3>
+            <p>
+              Give <code>pl</code> tabular text on stdin, a CSV file, or a SQLite query. It infers headers, numeric
+              columns and a sensible default chart.
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code><span class="comment"># stdin</span>
+printf 'day,signups\nMon,3\nTue,5\nWed,4\n' | pl
+
+<span class="comment"># one or more files</span>
+pl sales.csv
+pl january.csv february.csv march.csv
+
+<span class="comment"># a PostgreSQL result</span>
+psql --csv -c "select day, signups from metrics order by day" | pl</code></pre>
+            </div>
+            <div class="callout">
+              The default is a bar chart for one categorical series of 30 rows or fewer; otherwise a line chart.
+              Use <code>--type</code> to choose explicitly.
+            </div>
+          </article>
+
+          <article class="doc-block" id="charts-guide">
+            <h3>Chart types</h3>
+            <p>Four families, one renderer, the same input pipeline:</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Type</th><th>Use it for</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>line</code> / <code>plot</code></td><td>Trends, time series, several value columns</td><td>Braille subcells, up to 8 series, gaps for nulls.</td></tr>
+                  <tr><td><code>bar</code> / <code>graph</code></td><td>One categorical series</td><td>Vertical bars, positive and negative values, sampled labels.</td></tr>
+                  <tr><td><code>pie</code></td><td>Parts of a whole</td><td>Explicit only; needs at least two non-zero slices.</td></tr>
+                  <tr><td><code>donut</code></td><td>Parts of a whole, with a hollow center</td><td>Same rules as pie, with a legend and percentages.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="doc-block" id="examples">
+            <h3>Examples</h3>
+            <p>Pick columns, rename labels, sort, filter and title the chart without touching the source data.</p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code><span class="comment"># explicit columns and order</span>
+pl sales.csv --label month --columns revenue,cost --type line
+
+<span class="comment"># sort and filter before rendering</span>
+pl sales.csv --filter 'region=EU' --filter 'revenue>=1000' --sort revenue:desc
+
+<span class="comment"># rename is display-only</span>
+pl sales.csv --rename revenue=ARR --title "ARR by month"
+
+<span class="comment"># ASCII output for CI or a limited terminal</span>
+pl sales.csv --ascii --width 72 --height 20</code></pre>
+            </div>
+          </article>
+
+          <article class="doc-block" id="sqlite">
+            <h3>SQLite</h3>
+            <p>
+              Point <code>--db</code> at a local SQLite file and pass SQL with <code>--query</code> or
+              <code>--query-file</code>. The source is opened read-only.
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code>pl --db metrics.db --query 'select day, signups from metrics order by day'
+pl --db metrics.db --query-file queries/signups.sql --timeout 5s
+
+<span class="comment"># environment variables also work</span>
+PL_DB=metrics.db PL_QUERY='select * from weekly' pl</code></pre>
+            </div>
+          </article>
+
+          <article class="doc-block" id="tui">
+            <h3>TUI</h3>
+            <p>
+              <code>--tui</code> requires a real terminal on stdin and stdout. If either side is piped, <code>pl</code>
+              falls back to CLI mode with one warning.
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code>pl --tui sales.csv
+pl --tui --no-motion sales.csv   <span class="comment"># static first frame</span></code></pre>
+            </div>
+            <div class="key-grid">
+              <div class="key-item"><kbd>q</kbd><span>Quit</span></div>
+              <div class="key-item"><kbd>tab</kbd><span>Next chart type</span></div>
+              <div class="key-item"><kbd>shift+tab</kbd><span>Previous chart type</span></div>
+              <div class="key-item"><kbd>?</kbd><span>Open full help</span></div>
+              <div class="key-item"><kbd>esc</kbd><span>Close help</span></div>
+              <div class="key-item"><kbd>↑ ↓ j k</kbd><span>Scroll overflowing help</span></div>
+            </div>
+          </article>
+
+          <article class="doc-block" id="config">
+            <h3>Config</h3>
+            <p>
+              The optional config lives at <code>os.UserConfigDir()/pl/config.toml</code> and is parsed strictly.
+              Precedence is <strong>flag &gt; environment &gt; config &gt; default</strong>; paths in the file resolve
+              relative to the file.
+            </p>
+            <div class="code-block">
+              <button class="copy" type="button">Copy</button>
+              <pre><code>[database]
+path = "metrics.db"
+query = "select day, signups from metrics order by day"
+timeout = "10s"
+
+[display]
+color = "auto"
+ascii = false
+width = 0
+height = 0
+
+[cache]
+enabled = true
+dir = ""          <span class="comment"># default: os.UserCacheDir()/pl</span>
+ttl = "168h"
+max_size = "64MiB"</code></pre>
+            </div>
+            <p>
+              Use <code>--config path.toml</code> or <code>PL_CONFIG=path.toml</code>. Disable the parsed-dataset
+              cache with <code>--no-cache</code> or <code>PL_CACHE_DISABLE=1</code>.
+            </p>
+          </article>
+
+          <article class="doc-block" id="flags">
+            <h3>Flags</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Flag</th><th>What it does</th><th>Default</th></tr>
+                </thead>
+                <tbody>
+                  <tr class="group"><th colspan="3">Chart</th></tr>
+                  <tr><td><code>--type</code></td><td><code>line</code>, <code>bar</code>, <code>pie</code>, <code>donut</code> (aliases <code>plot</code>, <code>graph</code>)</td><td>auto</td></tr>
+                  <tr><td><code>--label</code></td><td>Label column by name or 1-based position</td><td>inferred</td></tr>
+                  <tr><td><code>--columns</code></td><td>Value columns, repeatable</td><td>all value columns</td></tr>
+                  <tr><td><code>--rename</code></td><td>Display rename <code>old=new</code>, repeatable</td><td>none</td></tr>
+                  <tr><td><code>--title</code></td><td>Chart title</td><td><code>&lt;source&gt; — &lt;type&gt;</code></td></tr>
+                  <tr><td><code>--sort</code></td><td><code>column[:asc|desc]</code>, repeatable</td><td>source order</td></tr>
+                  <tr><td><code>--filter</code></td><td><code>column&lt;op&gt;value</code>, repeatable with AND</td><td>none</td></tr>
+
+                  <tr class="group"><th colspan="3">Input</th></tr>
+                  <tr><td><code>--delimiter</code></td><td><code>auto</code>, <code>comma</code>, <code>tab</code>, <code>semicolon</code>, <code>pipe</code> or one rune</td><td>auto</td></tr>
+                  <tr><td><code>--header</code> / <code>--no-header</code></td><td>Force header detection</td><td>auto</td></tr>
+                  <tr><td><code>--db</code></td><td>SQLite file path</td><td>config / <code>PL_DB</code></td></tr>
+                  <tr><td><code>--query</code></td><td>SQL text</td><td>config / <code>PL_QUERY</code></td></tr>
+                  <tr><td><code>--query-file</code></td><td>Read SQL from a file</td><td>config</td></tr>
+                  <tr><td><code>--timeout</code></td><td>Query timeout (Go duration)</td><td><code>10s</code></td></tr>
+
+                  <tr class="group"><th colspan="3">Display</th></tr>
+                  <tr><td><code>--width</code> / <code>--height</code></td><td>Chart size in cells (CLI only)</td><td>terminal / 80×24</td></tr>
+                  <tr><td><code>--color</code></td><td><code>auto</code>, <code>always</code>, <code>never</code></td><td>auto</td></tr>
+                  <tr><td><code>--ascii</code></td><td>Force ASCII glyphs</td><td>auto</td></tr>
+                  <tr><td><code>--tui</code></td><td>Interactive view</td><td>false</td></tr>
+                  <tr><td><code>--no-motion</code></td><td>Disable TUI animation</td><td>false</td></tr>
+
+                  <tr class="group"><th colspan="3">Cache and config</th></tr>
+                  <tr><td><code>--no-cache</code></td><td>Disable cache reads and writes</td><td>false</td></tr>
+                  <tr><td><code>--cache-dir</code></td><td>Cache directory</td><td><code>os.UserCacheDir()/pl</code></td></tr>
+                  <tr><td><code>--config</code></td><td>TOML config path</td><td><code>os.UserConfigDir()/pl/config.toml</code></td></tr>
+                  <tr><td><code>--help</code> / <code>--version</code></td><td>Print help or version and exit</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="doc-block" id="environment">
+            <h3>Environment</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Variable</th><th>Effect</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>PL_CONFIG</code></td><td>Config file path</td></tr>
+                  <tr><td><code>PL_DB</code> / <code>PL_QUERY</code></td><td>SQLite source and query</td></tr>
+                  <tr><td><code>PL_CACHE_DIR</code> / <code>PL_CACHE_DISABLE</code></td><td>Cache directory and opt-out</td></tr>
+                  <tr><td><code>PL_LANG</code></td><td>Locale override (BCP 47)</td></tr>
+                  <tr><td><code>NO_COLOR</code> / <code>TERM=dumb</code></td><td>Plain output and ASCII glyphs</td></tr>
+                  <tr><td><code>DEBUG=1</code></td><td>Write diagnostics to <code>os.UserCacheDir()/pl/debug.log</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="doc-block" id="exit-codes">
+            <h3>Exit codes</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Code</th><th>Meaning</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>0</code></td><td>Chart rendered; help, version or a clean TUI quit</td></tr>
+                  <tr><td><code>1</code></td><td>Data or environment error</td></tr>
+                  <tr><td><code>2</code></td><td>Usage or configuration error</td></tr>
+                  <tr><td><code>3</code></td><td>Source access error</td></tr>
+                  <tr><td><code>130</code></td><td>Interrupted</td></tr>
+                  <tr><td><code>141</code></td><td>Broken pipe</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" aria-labelledby="cta-title">
+      <div class="cta reveal">
+        <h2 id="cta-title">Your next chart is one pipe away.</h2>
+        <p>
+          Install the binary, point it at a file or a query, and keep moving. The source, issues and roadmap are on GitHub.
+        </p>
+        <div class="cta-actions">
+          <div class="install-pill" style="margin: 0; background: rgba(19, 23, 7, 0.08); border-color: rgba(19, 23, 7, 0.18); color: var(--accent-ink);">
+            <code>go install github.com/sazardev/plot/cmd/pl@latest</code>
+            <button class="copy" type="button" data-copy-text="go install github.com/sazardev/plot/cmd/pl@latest" style="background: var(--accent-ink); color: var(--accent); border-color: transparent;">Copy</button>
+          </div>
+          <a class="button button-ghost" href="https://github.com/sazardev/plot">Star on GitHub <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a class="brand" href="#top" aria-label="Back to top">
+            <span class="brand-mark">pl</span>
+            <span class="brand-meta"><strong>plot</strong><small>terminal charts</small></span>
+          </a>
+          <p>A fast, local-first data plotter for people who already live in a shell.</p>
+        </div>
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="#docs">Guide</a>
+          <a href="#flags">Flags</a>
+          <a href="https://github.com/sazardev/plot">GitHub</a>
+          <a href="https://github.com/sazardev/plot/issues">Issues</a>
+          <a href="https://github.com/sazardev/plot/blob/main/LICENSE">MIT License</a>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span data-year>2026</span> Omar Flores Salazar · built with Go and Bubble Tea</span>
+        <span>No trackers. No cookies. Just charts.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js" defer></script>
+</body>
+</html>
