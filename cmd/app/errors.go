@@ -161,6 +161,76 @@ func mapDomainError(err error, sourcePath string, fromStdin bool) *appError {
 	case errors.Is(err, domain.ErrNoValues):
 		return newAppError(exitData, "cli.error.no_values", nil, err)
 
+	case errors.Is(err, domain.ErrColumnNotFound):
+		var notFound *domain.ColumnNotFoundError
+		if errors.As(err, &notFound) {
+			return newAppError(exitUsage, "cli.error.column_not_found", map[string]any{
+				"Column":    domain.SanitizeText(notFound.Spec),
+				"Available": domain.SanitizeText(strings.Join(notFound.Available, ", ")),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.column_not_found", map[string]any{
+			"Column": "?", "Available": "?",
+		}, err)
+
+	case errors.Is(err, domain.ErrColumnNotNumeric):
+		var notNumeric *domain.ColumnNotNumericError
+		if errors.As(err, &notNumeric) {
+			return newAppError(exitUsage, "cli.error.column_not_numeric", map[string]any{
+				"Column": domain.SanitizeText(notNumeric.Column),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.column_not_numeric", map[string]any{"Column": "?"}, err)
+
+	case errors.Is(err, domain.ErrInvalidFilter):
+		var invalid *domain.InvalidFilterError
+		if errors.As(err, &invalid) {
+			return newAppError(exitUsage, "cli.error.filter", map[string]any{
+				"Detail": domain.SanitizeText(invalid.Detail),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.filter", map[string]any{"Detail": err.Error()}, err)
+
+	case errors.Is(err, domain.ErrInvalidSort):
+		var invalid *domain.InvalidSortError
+		if errors.As(err, &invalid) {
+			return newAppError(exitUsage, "cli.error.sort", map[string]any{
+				"Detail": domain.SanitizeText(invalid.Detail),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.sort", map[string]any{"Detail": err.Error()}, err)
+
+	case errors.Is(err, domain.ErrInvalidRename):
+		var invalid *domain.InvalidRenameError
+		if errors.As(err, &invalid) {
+			return newAppError(exitUsage, "cli.error.rename", map[string]any{
+				"Detail": domain.SanitizeText(invalid.Detail),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.rename", map[string]any{"Detail": err.Error()}, err)
+
+	case errors.Is(err, domain.ErrDuplicateLabel):
+		var duplicate *domain.DuplicateLabelError
+		if errors.As(err, &duplicate) {
+			return newAppError(exitUsage, "cli.error.duplicate_label", map[string]any{
+				"Label": domain.SanitizeText(duplicate.Label),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.duplicate_label", map[string]any{"Label": "?"}, err)
+
+	case errors.Is(err, domain.ErrTooManySeries):
+		var tooMany *domain.TooManySeriesError
+		if errors.As(err, &tooMany) {
+			return newAppError(exitUsage, "cli.error.too_many_series", map[string]any{
+				"Chosen": strconv.Itoa(tooMany.Chosen),
+				"Max":    strconv.Itoa(tooMany.Max),
+			}, err)
+		}
+		return newAppError(exitUsage, "cli.error.too_many_series", map[string]any{"Chosen": "?", "Max": "?"}, err)
+
+	case errors.Is(err, domain.ErrNoRowsAfterFilter):
+		return newAppError(exitData, "cli.error.no_rows_after_filter", nil, err)
+
 	case errors.Is(err, domain.ErrUsage):
 		var usage *domain.UsageError
 		if errors.As(err, &usage) {

@@ -62,7 +62,47 @@ func ReadFile(path string, opts CSVOptions) (*domain.Dataset, error) {
 		}
 		return nil, &domain.SourceError{Path: path, Err: err}
 	}
+	ds.SourceCount = 1
 	return ds, nil
+}
+
+// ReadFiles parses several files and concatenates rows when their schemas
+// match. The first file owns the schema; every later file must match it.
+func ReadFiles(paths []string, opts CSVOptions) (*domain.Dataset, error) {
+	if len(paths) == 0 {
+		return nil, domain.ErrNoData
+	}
+	combined, err := ReadFile(paths[0], opts)
+	if err != nil {
+		return nil, err
+	}
+	combined.SourceID = paths[0]
+	combined.SourceCount = len(paths)
+
+	for _, path := range paths[1:] {
+		next, err := ReadFile(path, opts)
+		if err != nil {
+			return nil, err
+		}
+		if len(next.Columns) != len(combined.Columns) {
+			return nil, &domain.SourceError{
+				Path: path,
+				Err:  fmt.Errorf("expected %d fields, got %d", len(combined.Columns), len(next.Columns)),
+			}
+		}
+		for i := range combined.Columns {
+			if next.Columns[i].Name != combined.Columns[i].Name {
+				return nil, &domain.SourceError{
+					Path: path,
+					Err:  fmt.Errorf("expected column %q, got %q", combined.Columns[i].Name, next.Columns[i].Name),
+				}
+			}
+		}
+		combined.Rows = append(combined.Rows, next.Rows...)
+		combined.RowCount += next.RowCount
+		combined.Warnings = append(combined.Warnings, next.Warnings...)
+	}
+	return combined, nil
 }
 
 // ReadCSV parses delimited text from r. It returns text cells only; callers
@@ -183,12 +223,13 @@ func ReadCSV(r io.Reader, opts CSVOptions) (*domain.Dataset, error) {
 	}
 
 	return &domain.Dataset{
-		Columns:    columns,
-		Rows:       rows,
-		SourceKind: sourceKind,
-		SourceID:   sourceID,
-		RowCount:   len(rows),
-		Warnings:   warnings,
+		Columns:     columns,
+		Rows:        rows,
+		SourceKind:  sourceKind,
+		SourceID:    sourceID,
+		SourceCount: 1,
+		RowCount:    len(rows),
+		Warnings:    warnings,
 	}, nil
 }
 

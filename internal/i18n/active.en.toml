@@ -19,7 +19,7 @@ other = "Input"
 ["cli.help.input"]
 description = "Input modes supported by the CLI."
 other = """  stdin is read when it is not a TTY and no file is given.
-  Use '-' to read stdin explicitly; pass a file path to read a file."""
+  Use '-' to read stdin explicitly; pass one or more matching files to concatenate them."""
 
 ["cli.help.types_label"]
 description = "Label before supported chart types."
@@ -43,6 +43,7 @@ other = "Examples"
 description = "Example invocations."
 other = """  printf 'day,signups\\nMon,3\\nTue,5\\n' | pl
   pl sales.csv
+  pl sales.csv --columns revenue --sort revenue:desc --filter 'revenue>=1000'
   pl sales.csv --type bar --title 'Revenue'"""
 
 ["cli.help.exit_label"]
@@ -56,6 +57,26 @@ other = "  0 success; 1 data/environment error; 2 usage error; 3 source error; 1
 ["cli.flag.type"]
 description = "Flag description for --type."
 other = "chart type: line, bar, plot or graph"
+
+["cli.flag.label"]
+description = "Flag description for --label."
+other = "label/x column by name or 1-based position"
+
+["cli.flag.columns"]
+description = "Flag description for --columns."
+other = "comma-separated or repeated value columns by name or 1-based position"
+
+["cli.flag.rename"]
+description = "Flag description for --rename."
+other = "rename a column for display: old=new; repeated or comma-separated"
+
+["cli.flag.sort"]
+description = "Flag description for --sort."
+other = "sort rows: column[:asc|desc]; repeated or comma-separated"
+
+["cli.flag.filter"]
+description = "Flag description for --filter."
+other = "filter rows: column<op>value; repeatable (AND)"
 
 ["cli.flag.delimiter"]
 description = "Flag description for --delimiter."
@@ -169,9 +190,49 @@ other = "no plottable values"
 description = "An unexpected internal failure."
 other = "internal error: {{.Detail}}"
 
-["cli.error.multiple_files"]
-description = "Multiple positional files are not implemented yet."
-other = "multiple files are not implemented yet; pass one file"
+["cli.error.stdin_with_files"]
+description = "stdin was combined with multiple file arguments."
+other = "stdin cannot be combined with multiple files yet"
+
+["cli.error.label_empty"]
+description = "--label was supplied without a column."
+other = "--label needs a column name or position"
+
+["cli.error.columns_empty"]
+description = "--columns was supplied without any entries."
+other = "--columns needs at least one column name or position"
+
+["cli.error.column_not_found"]
+description = "A column reference did not match."
+other = "column {{.Column}} not found; available: {{.Available}}"
+
+["cli.error.column_not_numeric"]
+description = "A --columns entry was not a numeric value column."
+other = "column {{.Column}} is not numeric; use --label for a label column"
+
+["cli.error.filter"]
+description = "A filter expression is invalid."
+other = "invalid filter: {{.Detail}}"
+
+["cli.error.sort"]
+description = "A sort expression is invalid."
+other = "invalid sort: {{.Detail}}"
+
+["cli.error.rename"]
+description = "A rename expression is invalid."
+other = "invalid rename: {{.Detail}}"
+
+["cli.error.duplicate_label"]
+description = "Two plotted columns have the same display name."
+other = "duplicate display label {{.Label}}"
+
+["cli.error.too_many_series"]
+description = "An explicit selection exceeds the chart series limit."
+other = "selected {{.Chosen}} series; the maximum is {{.Max}}"
+
+["cli.error.no_rows_after_filter"]
+description = "Filters removed every data row."
+other = "no rows after filter"
 
 ["cli.error.invalid_delimiter"]
 description = "The delimiter value is invalid."

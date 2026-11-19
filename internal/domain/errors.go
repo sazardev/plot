@@ -21,6 +21,14 @@ var (
 	ErrUnsupportedChart  = errors.New("unsupported chart")
 	ErrTooSmall          = errors.New("terminal too small")
 	ErrTooManyBars       = errors.New("too many bars")
+	ErrColumnNotFound    = errors.New("column not found")
+	ErrInvalidFilter     = errors.New("invalid filter")
+	ErrInvalidSort       = errors.New("invalid sort")
+	ErrInvalidRename     = errors.New("invalid rename")
+	ErrDuplicateLabel    = errors.New("duplicate display label")
+	ErrTooManySeries     = errors.New("too many series")
+	ErrNoRowsAfterFilter = errors.New("no rows after filter")
+	ErrColumnNotNumeric  = errors.New("column is not numeric")
 )
 
 // NoNumericColumnError lists the columns the user could have selected.
@@ -138,3 +146,87 @@ func (e *TooManyBarsError) Error() string {
 }
 
 func (e *TooManyBarsError) Unwrap() error { return ErrTooManyBars }
+
+// ColumnNotFoundError lists the columns available for a reference.
+type ColumnNotFoundError struct {
+	Spec      string
+	Available []string
+}
+
+func (e *ColumnNotFoundError) Error() string {
+	if len(e.Available) == 0 {
+		return fmt.Sprintf("column %q not found", e.Spec)
+	}
+	return fmt.Sprintf("column %q not found; available: %s", e.Spec, strings.Join(e.Available, ", "))
+}
+
+func (e *ColumnNotFoundError) Unwrap() error { return ErrColumnNotFound }
+
+// InvalidFilterError reports a malformed filter expression or value.
+type InvalidFilterError struct {
+	Detail string
+}
+
+func (e *InvalidFilterError) Error() string { return e.Detail }
+func (e *InvalidFilterError) Unwrap() error { return ErrInvalidFilter }
+
+// InvalidSortError reports a malformed sort expression.
+type InvalidSortError struct {
+	Detail string
+}
+
+func (e *InvalidSortError) Error() string { return e.Detail }
+func (e *InvalidSortError) Unwrap() error { return ErrInvalidSort }
+
+// InvalidRenameError reports a malformed rename expression.
+type InvalidRenameError struct {
+	Detail string
+}
+
+func (e *InvalidRenameError) Error() string { return e.Detail }
+func (e *InvalidRenameError) Unwrap() error { return ErrInvalidRename }
+
+// DuplicateLabelError reports two plotted columns with the same display name.
+type DuplicateLabelError struct {
+	Label string
+}
+
+func (e *DuplicateLabelError) Error() string {
+	return fmt.Sprintf("duplicate display label %q", e.Label)
+}
+
+func (e *DuplicateLabelError) Unwrap() error { return ErrDuplicateLabel }
+
+// TooManySeriesError reports an explicit selection beyond the chart limit.
+type TooManySeriesError struct {
+	Chosen int
+	Max    int
+}
+
+func (e *TooManySeriesError) Error() string {
+	return fmt.Sprintf("selected %d series; maximum is %d", e.Chosen, e.Max)
+}
+
+func (e *TooManySeriesError) Unwrap() error { return ErrTooManySeries }
+
+// NoRowsAfterFilterError reports a filter that removed every row.
+type NoRowsAfterFilterError struct {
+	Filters int
+}
+
+func (e *NoRowsAfterFilterError) Error() string {
+	return fmt.Sprintf("no rows after %d filter(s)", e.Filters)
+}
+
+func (e *NoRowsAfterFilterError) Unwrap() error { return ErrNoRowsAfterFilter }
+
+// ColumnNotNumericError reports a --columns entry that is not a value column.
+type ColumnNotNumericError struct {
+	Column string
+}
+
+func (e *ColumnNotNumericError) Error() string {
+	return fmt.Sprintf("column %q is not numeric", e.Column)
+}
+
+func (e *ColumnNotNumericError) Unwrap() error { return ErrColumnNotNumeric }

@@ -303,95 +303,37 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 		opts.GlyphMode = GlyphAuto
 	}
 
-	labelIdx := -1
-	var labelCols []string
-	for i := range ds.Columns {
-		if ds.Columns[i].Kind == ColumnLabel && ds.Columns[i].ValueType != TypeEmpty {
-			labelCols = append(labelCols, ds.Columns[i].Name)
-			if labelIdx == -1 {
-				labelIdx = i
-			}
-		}
+	renames, err := parseRenames(ds, opts.Renames)
+	if err != nil {
+		return nil, err
+	}
+	filters, err := parseFilters(ds, opts.Filters)
+	if err != nil {
+		return nil, err
+	}
+	sorts, err := parseSorts(ds, opts.Sorts)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := resolveSelection(ds, opts, renames)
+	if err != nil {
+		return nil, err
 	}
 
-	valueIdxs := make([]int, 0, len(ds.Columns))
-	for i := range ds.Columns {
-		if ds.Columns[i].Kind == ColumnValue && ds.Columns[i].ValueType != TypeEmpty {
-			valueIdxs = append(valueIdxs, i)
-		}
+	if err := applyFilters(ds, filters); err != nil {
+		return nil, err
 	}
-	if len(valueIdxs) == 0 {
-		return nil, &NoNumericColumnError{Available: columnNames(ds)}
-	}
-
-	syntheticRow := false
-	if labelIdx == -1 {
-		switch len(valueIdxs) {
-		case 1:
-			syntheticRow = true
-		default:
-			labelIdx = valueIdxs[0]
-			valueIdxs = valueIdxs[1:]
-		}
-	}
-
-	seriesIdxs := make([]int, 0, len(valueIdxs))
-	for _, idx := range valueIdxs {
-		if idx != labelIdx {
-			seriesIdxs = append(seriesIdxs, idx)
-		}
-	}
-	if len(seriesIdxs) == 0 {
-		return nil, &NoNumericColumnError{Available: columnNames(ds)}
-	}
-
-	if len(labelCols) > 1 {
-		ds.Warnings = append(ds.Warnings, Warning{
-			ID: "cli.warn.multiple_labels",
-			Data: map[string]string{
-				"Columns": strings.Join(labelCols, ", "),
-				"Used":    ds.Columns[labelIdx].Name,
-			},
-		})
-	}
-
-	if len(seriesIdxs) > opts.MaxSeries {
-		total := len(seriesIdxs)
-		seriesIdxs = seriesIdxs[:opts.MaxSeries]
-		ds.Warnings = append(ds.Warnings, Warning{
-			ID: "cli.warn.series_truncated",
-			Data: map[string]string{
-				"Shown": strconv.Itoa(opts.MaxSeries),
-				"Total": strconv.Itoa(total),
-			},
-		})
-	}
-
-	labelKind := LabelCategorical
-	labelName := "row"
-	if !syntheticRow {
-		labelName = SanitizeText(ds.Columns[labelIdx].Name)
-		switch ds.Columns[labelIdx].ValueType {
-		case TypeInt, TypeFloat:
-			labelKind = LabelNumeric
-		case TypeTime:
-			labelKind = LabelTime
-		default:
-			labelKind = LabelCategorical
-		}
-	} else {
-		labelKind = LabelNumeric
-	}
+	applySorts(ds, sorts)
 
 	labels := make([]string, len(ds.Rows))
 	xValues := make([]float64, len(ds.Rows))
 	for r := range ds.Rows {
-		if syntheticRow {
+		if selection.synthetic {
 			labels[r] = strconv.Itoa(r + 1)
 			xValues[r] = float64(r + 1)
 			continue
 		}
-		cell := ds.Rows[r][labelIdx]
+		cell := ds.Rows[r][selection.labelIdx]
 		switch {
 		case cell.Kind == CellNumber:
 			labels[r] = SanitizeText(formatNumber(cell.Number))
@@ -408,8 +350,8 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 		}
 	}
 
-	series := make([]Series, 0, len(seriesIdxs))
-	for n, idx := range seriesIdxs {
+	series := make([]Series, 0, len(selection.seriesIdxs))
+	for n, idx := range selection.seriesIdxs {
 		points := make([]Point, len(ds.Rows))
 		for r := range ds.Rows {
 			cell := ds.Rows[r][idx]
@@ -421,18 +363,18 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 		}
 		series = append(series, Series{
 			Column:    idx,
-			Label:     SanitizeText(ds.Columns[idx].Name),
+			Label:     selection.seriesNames[n],
 			Points:    points,
 			ColorSlot: n % 8,
 			Marker:    n % 8,
 		})
 	}
 
-	chartType, err := resolveChartType(opts.ChartType, series, labelKind, ds.RowCount, opts.Width)
+	chartType, err := resolveChartType(opts.ChartType, series, selection.labelKind, ds.RowCount, opts.Width)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(opts.ChartType) == "" && chartType == ChartLine && len(series) == 1 && labelKind == LabelCategorical {
+	if strings.TrimSpace(opts.ChartType) == "" && chartType == ChartLine && len(series) == 1 && selection.labelKind == LabelCategorical {
 		ds.Warnings = append(ds.Warnings, Warning{
 			ID:   "cli.warn.ordinal_axis",
 			Data: map[string]string{"Rows": strconv.Itoa(ds.RowCount)},
@@ -446,13 +388,15 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 			sep = " - "
 		}
 		title = SanitizeText(sourceTitle(ds) + sep + string(chartType))
+	} else {
+		title = SanitizeText(title)
 	}
 
 	return &RenderSpec{
 		ChartType:   chartType,
-		LabelColumn: labelIdx,
-		LabelName:   labelName,
-		LabelKind:   labelKind,
+		LabelColumn: selection.labelIdx,
+		LabelName:   selection.labelName,
+		LabelKind:   selection.labelKind,
 		Labels:      labels,
 		Series:      series,
 		Width:       opts.Width,
@@ -492,10 +436,14 @@ func resolveChartType(requested string, series []Series, labelKind LabelKind, ro
 func sourceTitle(ds *Dataset) string {
 	switch ds.SourceKind {
 	case SourceFile:
-		if base := filepath.Base(ds.SourceID); base != "" && base != "." {
-			return base
+		base := "file"
+		if name := filepath.Base(ds.SourceID); name != "" && name != "." {
+			base = name
 		}
-		return "file"
+		if ds.SourceCount > 1 {
+			return fmt.Sprintf("%s (+%d more)", base, ds.SourceCount-1)
+		}
+		return base
 	case SourceDB:
 		if base := filepath.Base(ds.SourceID); base != "" && base != "." {
 			return base

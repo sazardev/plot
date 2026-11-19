@@ -89,12 +89,13 @@ type Warning struct {
 
 // Dataset is the in-memory table after parsing and inference.
 type Dataset struct {
-	Columns    []Column
-	Rows       [][]Cell
-	SourceKind SourceKind
-	SourceID   string
-	RowCount   int
-	Warnings   []Warning
+	Columns     []Column
+	Rows        [][]Cell
+	SourceKind  SourceKind
+	SourceID    string
+	SourceCount int
+	RowCount    int
+	Warnings    []Warning
 }
 
 // Point is one plotted value. X is an index, a number or a Unix timestamp
@@ -170,6 +171,11 @@ type RenderSpec struct {
 // BuildOptions are the user-controlled inputs to chart resolution.
 type BuildOptions struct {
 	ChartType string
+	Label     string
+	Columns   []string
+	Renames   []string
+	Sorts     []string
+	Filters   []string
 	Width     int
 	Height    int
 	Title     string

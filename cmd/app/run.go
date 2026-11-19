@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/muesli/termenv"
 
@@ -42,6 +43,12 @@ func run(args []string, stream appIO) int {
 }
 
 func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) error {
+	if opts.LabelSet && strings.TrimSpace(opts.Label) == "" {
+		return usageError("cli.error.label_empty", nil)
+	}
+	if opts.ColumnsSet && len(opts.Columns) == 0 {
+		return usageError("cli.error.columns_empty", nil)
+	}
 	colorMode, colorEnabled, colorErr := resolveColor(opts.Color, stream.OutTTY, stream.Env)
 	if colorErr != nil {
 		return colorErr
@@ -75,6 +82,11 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 
 	spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{
 		ChartType: opts.Type,
+		Label:     opts.Label,
+		Columns:   opts.Columns,
+		Renames:   opts.Renames,
+		Sorts:     opts.Sorts,
+		Filters:   opts.Filters,
 		Width:     width,
 		Height:    height,
 		Title:     opts.Title,
@@ -144,7 +156,13 @@ func loadDataset(args []string, stream appIO, delimiter rune, header storage.Hea
 		ds, err := storage.ReadFile(args[0], options)
 		return ds, args[0], false, err
 	default:
-		return nil, "", false, usageError("cli.error.multiple_files", nil)
+		for _, arg := range args {
+			if arg == "-" {
+				return nil, "", true, usageError("cli.error.stdin_with_files", nil)
+			}
+		}
+		ds, err := storage.ReadFiles(args, options)
+		return ds, args[0], false, err
 	}
 }
 

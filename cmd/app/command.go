@@ -10,15 +10,22 @@ import (
 )
 
 type cliOptions struct {
-	Type      string
-	Delimiter string
-	Header    bool
-	NoHeader  bool
-	Width     int
-	Height    int
-	Color     string
-	ASCII     bool
-	Title     string
+	Type       string
+	Label      string
+	LabelSet   bool
+	Columns    []string
+	ColumnsSet bool
+	Renames    []string
+	Sorts      []string
+	Filters    []string
+	Delimiter  string
+	Header     bool
+	NoHeader   bool
+	Width      int
+	Height     int
+	Color      string
+	ASCII      bool
+	Title      string
 }
 
 func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Command {
@@ -28,7 +35,9 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.ArbitraryArgs,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.LabelSet = cmd.Flags().Changed("label")
+			opts.ColumnsSet = cmd.Flags().Changed("columns")
 			return runApp(args, opts, stream, loc)
 		},
 	}
@@ -36,6 +45,11 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.SetErr(stream.Err)
 
 	cmd.Flags().StringVar(&opts.Type, "type", "", loc.T("cli.flag.type", nil))
+	cmd.Flags().StringVar(&opts.Label, "label", "", loc.T("cli.flag.label", nil))
+	cmd.Flags().StringSliceVar(&opts.Columns, "columns", nil, loc.T("cli.flag.columns", nil))
+	cmd.Flags().StringArrayVar(&opts.Renames, "rename", nil, loc.T("cli.flag.rename", nil))
+	cmd.Flags().StringSliceVar(&opts.Sorts, "sort", nil, loc.T("cli.flag.sort", nil))
+	cmd.Flags().StringArrayVar(&opts.Filters, "filter", nil, loc.T("cli.flag.filter", nil))
 	cmd.Flags().StringVar(&opts.Delimiter, "delimiter", "auto", loc.T("cli.flag.delimiter", nil))
 	cmd.Flags().BoolVar(&opts.Header, "header", false, loc.T("cli.flag.header", nil))
 	cmd.Flags().BoolVar(&opts.NoHeader, "no-header", false, loc.T("cli.flag.no_header", nil))
