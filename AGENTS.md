@@ -10,7 +10,7 @@
 - [DESIGN.md](DESIGN.md): the design system: tokens, components and UI rules.
 - [SPEC.md](SPEC.md): what is being built: requirements, acceptance criteria and open questions.
 
-Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input, `internal/render` draws, and `internal/ui` holds the theme (and later the TUI). A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
+Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input, `internal/render` draws, and `internal/ui` holds the TUI root, keys, styles and messages. A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
 
 ## Commands
 
@@ -60,12 +60,12 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 
 ## Conventions
 
-- File organisation: one file = one responsibility. A screen has exactly `model.go` (state + `Init`), `update.go` (messages → state + `tea.Cmd`), `view.go` (pure rendering).
+- File organisation: one file = one responsibility. The current TUI is a single screen in `internal/ui`; split it into `screens/plot/{model,update,view}.go` when a second screen appears.
 - All styling lives in `internal/ui/styles.go`; all bindings in `internal/ui/keys.go`; every side effect is a `tea.Cmd` constructor in `commands.go`. No IO, timers or HTTP inside `Update` or `View`.
 - Colors are adaptive ANSI roles with a light and dark variant; honor `NO_COLOR`, `TERM=dumb` and non-TTY output. Never paint the app background.
 - Errors: wrap with `%w`, return instead of panicking, and surface user-facing failures as a single line on stderr. Database driver errors are printed verbatim. stdout belongs to plot output and the UI; logs go to a file via `tea.LogToFile` with `log/slog`.
 - i18n: no hard-coded user-facing strings in Go; ids and description go in `internal/i18n/active.en.toml`, translations in `active.<lng>.toml`, both embedded.
-- Tests sit next to the code in the same package (`<pkg>`), or `<pkg>_test` for the public API. Table-driven subtests with `stretchr/testify` `require`/`assert`. Golden output via `teatest`, fixtures in `testdata/`.
+- Tests sit next to the code in the same package (`<pkg>`), or `<pkg>_test` for the public API. Table-driven subtests with `stretchr/testify` `require`/`assert`. Render goldens use `internal/testutil`, TUI goldens use `teatest` or `-update-tui`, fixtures in `testdata/`.
 - Generated code (`internal/db/`) is regenerated with `sqlc generate`, never edited by hand, and committed.
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`); Lefthook enforces format, lint and the commit-msg check.
 
