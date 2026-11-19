@@ -20,3 +20,8 @@ type loadErrMsg struct {
 }
 
 type animationTickMsg struct{}
+
+type exportedMsg struct {
+	path string
+	err  error
+}

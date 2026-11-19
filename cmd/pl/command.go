@@ -39,6 +39,7 @@ type cliOptions struct {
 	NoCache    bool
 	CacheTTL   time.Duration
 	CacheMax   int64
+	Export     string
 	changed    map[string]bool
 }
 
@@ -81,6 +82,7 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.NoMotion, "no-motion", false, loc.T("cli.flag.no_motion", nil))
 	cmd.Flags().BoolVar(&opts.NoCache, "no-cache", false, loc.T("cli.flag.no_cache", nil))
 	cmd.Flags().StringVar(&opts.CacheDir, "cache-dir", "", loc.T("cli.flag.cache_dir", nil))
+	cmd.Flags().StringVar(&opts.Export, "export", "", loc.T("cli.flag.export", nil))
 	cmd.Flags().StringVar(&opts.DB, "db", "", loc.T("cli.flag.db", nil))
 	cmd.Flags().StringVar(&opts.Query, "query", "", loc.T("cli.flag.query", nil))
 	cmd.Flags().StringVar(&opts.QueryFile, "query-file", "", loc.T("cli.flag.query_file", nil))

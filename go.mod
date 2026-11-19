@@ -9,12 +9,14 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20261118134922-ee8f5034ce23
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/mattn/go-runewidth v0.0.31
 	github.com/muesli/termenv v0.16.0
 	github.com/nicksnyder/go-i18n/v2 v2.7.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/image v0.48.0
 	golang.org/x/term v0.48.0
 	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.62.0

@@ -15,6 +15,7 @@ import (
 
 	"github.com/sazardev/plot/internal/config"
 	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/export"
 	"github.com/sazardev/plot/internal/i18n"
 	"github.com/sazardev/plot/internal/render"
 	"github.com/sazardev/plot/internal/storage"
@@ -119,9 +120,33 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 		ASCII:   ascii,
 		Profile: profile,
 	})
+	exportTheme := theme
+	forceExportTheme := false
+	if opts.Export != "" && !colorEnabled && colorMode != domain.ColorNever {
+		forceExportTheme = true
+		// A file export is not a terminal stream: keep the terminal chart
+		// monochrome when the user asked for it, but make automatic non-TTY
+		// exports colorful so the saved image retains the series palette.
+		exportTheme = ui.NewTheme(ui.ThemeOptions{
+			Color:   true,
+			ASCII:   ascii,
+			Profile: termenv.TrueColor,
+		})
+	}
 
+	if opts.TUI && opts.Export != "" {
+		return usageError("cli.error.export_tui", nil)
+	}
 	if opts.TUI && (opts.Width != 0 || opts.Height != 0) {
 		return usageError("cli.error.tui_size", nil)
+	}
+	if opts.Export != "" {
+		if _, err := export.FormatForPath(opts.Export); err != nil {
+			return usageError("cli.error.export_format", map[string]any{
+				"Path":   domain.SanitizeText(opts.Export),
+				"Detail": domain.SanitizeText(err.Error()),
+			})
+		}
 	}
 	if opts.TUI {
 		if !stream.InTTY || !stream.OutTTY {
@@ -151,6 +176,22 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 			return newAppError(exitBrokenPipe, "", nil, err)
 		}
 		return newAppError(exitData, "cli.error.internal", map[string]any{"Detail": err.Error()}, err)
+	}
+	if opts.Export != "" {
+		exportFrame := frame
+		if forceExportTheme {
+			var renderErr error
+			exportFrame, renderErr = render.Chart(spec, exportTheme)
+			if renderErr != nil {
+				return asAppError(renderErr, sourcePath, fromStdin)
+			}
+		}
+		if err := export.WriteFrame(exportFrame, opts.Export); err != nil {
+			return newAppError(exitData, "cli.error.export", map[string]any{
+				"Path":   domain.SanitizeText(opts.Export),
+				"Detail": domain.SanitizeText(err.Error()),
+			}, err)
+		}
 	}
 
 	if stream.Err != nil {

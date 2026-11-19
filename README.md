@@ -40,7 +40,11 @@ psql --csv -c "select day, signups from metrics order by day" | pl
 # SQLite directly
 pl --db metrics.db --query 'select day, signups from metrics order by day'
 
-# interactive TUI
+# save the same chart as an image or PDF
+pl sales.csv --export chart.png
+pl sales.csv --export chart.pdf
+
+# interactive TUI; press e to export
 pl --tui sales.csv
 ```
 
@@ -59,7 +63,8 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 - Localized messages and locale-aware number formatting.
 - A disposable SQLite cache with content-addressed keys, TTL, LRU eviction and user-only permissions.
 - Strict TOML configuration with flags > environment > config > default precedence.
-- A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with PNG/JPG/WebP/PDF export, saved history and a local data agent.
+- Native PNG/JPG/PDF export from the same terminal frame: `--export chart.png` or `e` in the TUI.
+- A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with saved history and a local data agent.
 
 ## Try the example workspace
 

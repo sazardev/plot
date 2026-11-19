@@ -89,6 +89,10 @@ other = "disable the parsed-dataset cache"
 description = "Flag description for --cache-dir."
 other = "cache directory"
 
+["cli.flag.export"]
+description = "Flag description for --export."
+other = "export the chart to a .png, .jpg or .pdf file"
+
 ["cli.flag.config"]
 description = "Flag description for --config."
 other = "TOML configuration file"
@@ -241,6 +245,18 @@ other = "--tui uses the terminal size; do not pass --width or --height"
 description = "A recovered internal panic was printed as one line."
 other = "internal error; rerun with DEBUG=1 to write details to the debug log"
 
+["cli.error.export_format"]
+description = "The --export path has an unsupported extension."
+other = "invalid export path {{.Path}}: {{.Detail}}"
+
+["cli.error.export"]
+description = "Writing the exported chart failed."
+other = "could not export chart to {{.Path}}: {{.Detail}}"
+
+["cli.error.export_tui"]
+description = "The CLI export flag cannot be combined with --tui."
+other = "use --tui without --export; press e inside the TUI to export"
+
 ["cli.error.config"]
 description = "The configuration file could not be loaded."
 other = "invalid config {{.Path}}: {{.Detail}}"
@@ -377,6 +393,30 @@ other = "loading..."
 description = "TUI load error heading."
 other = "could not load data"
 
+["tui.export.title"]
+description = "TUI export panel title."
+other = "Export current chart"
+
+["tui.export.hint"]
+description = "TUI export panel choices."
+other = "p  PNG\nj  JPG\nd  PDF\nesc  cancel"
+
+["tui.export.done"]
+description = "TUI status after a successful chart export."
+other = "exported {{.Path}}"
+
+["tui.export.failed"]
+description = "TUI status after a failed chart export."
+other = "export failed: {{.Detail}}"
+
+["tui.export.unavailable"]
+description = "TUI export requested without an exporter."
+other = "export is unavailable"
+
+["tui.only_compatible"]
+description = "TUI notice when only one chart type fits the data."
+other = "only {{.Type}} fits this dataset; tab needs a single-series table"
+
 ["tui.press_quit"]
 description = "Quit hint on an error screen."
 other = "press q to quit"
@@ -456,6 +496,10 @@ other = "scroll down"
 ["tui.key.left"]
 description = "Scroll left key help."
 other = "scroll left"
+
+["tui.key.export"]
+description = "TUI key binding: export the current chart."
+other = "export"
 
 ["tui.key.right"]
 description = "Scroll right key help."

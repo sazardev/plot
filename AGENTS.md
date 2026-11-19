@@ -35,6 +35,7 @@ Read the code around a change before writing: `cmd/pl` is the entry point, `inte
 | Apply migrations | `goose -dir db/migrations up` |
 | Install git hooks | `lefthook install` |
 | Serve the site | `python3 -m http.server -d docs 8765` |
+| Export a chart | `./pl data.csv --export chart.png` |
 | Run examples | `./examples/run.sh` or `./examples/run.sh bar` |
 | Release dry run | `goreleaser release --snapshot --clean` |
 
@@ -48,6 +49,7 @@ internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, infer
 internal/config/    strict TOML config, path resolution, duration/size parsing
 internal/storage/   delimited input (stdin/CSV), read-only SQLite source, disposable SQLite cache
 internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
+internal/export/    raster/PDF export of rendered terminal frames (PNG, JPG, PDF)
 internal/ui/        app.go root model, keys.go, styles.go, msgs.go, commands.go
 internal/ui/testdata/  TUI golden files (updated with -update-tui)
 internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)

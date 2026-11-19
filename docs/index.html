@@ -630,11 +630,16 @@ PL_DB=metrics.db PL_QUERY='select * from weekly' pl</code></pre>
               <pre tabindex="0"><code>pl --tui sales.csv
 pl --tui --no-motion sales.csv   <span class="comment"># static first frame</span></code></pre>
             </div>
+            <div class="callout" style="margin-top: 1rem;">
+              <code>tab</code> cycles only chart types compatible with the data. Multi-series files usually fit
+              line only; a single-series file can use line, bar, pie and donut.
+            </div>
             <div class="key-grid">
               <div class="key-item"><kbd>q</kbd><span>Quit</span></div>
               <div class="key-item"><kbd>tab</kbd><span>Next chart type</span></div>
               <div class="key-item"><kbd>shift+tab</kbd><span>Previous chart type</span></div>
               <div class="key-item"><kbd>?</kbd><span>Open full help</span></div>
+              <div class="key-item"><kbd>e</kbd><span>Export chart (PNG/JPG/PDF)</span></div>
               <div class="key-item"><kbd>esc</kbd><span>Close help</span></div>
               <div class="key-item"><kbd>↑ ↓ j k</kbd><span>Scroll overflowing help</span></div>
             </div>
@@ -707,6 +712,7 @@ max_size = "64MiB"</code></pre>
                   <tr class="group"><th colspan="3">Cache and config</th></tr>
                   <tr><td><code>--no-cache</code></td><td>Disable cache reads and writes</td><td>false</td></tr>
                   <tr><td><code>--cache-dir</code></td><td>Cache directory</td><td><code>os.UserCacheDir()/pl</code></td></tr>
+                  <tr><td><code>--export</code></td><td>Export the rendered chart to <code>.png</code>, <code>.jpg</code> or <code>.pdf</code></td><td>none</td></tr>
                   <tr><td><code>--config</code></td><td>TOML config path</td><td><code>os.UserConfigDir()/pl/config.toml</code></td></tr>
                   <tr><td><code>--help</code> / <code>--version</code></td><td>Print help or version and exit</td><td>—</td></tr>
                 </tbody>

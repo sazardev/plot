@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -1167,4 +1168,45 @@ func TestRunEnvironmentQueryOverridesConfigQueryFile(t *testing.T) {
 	require.Equal(t, 0, code)
 	assert.Empty(t, errOut.String())
 	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunExportsPNG(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "chart.png")
+	stream, out, errOut := testIO("month,revenue\nJan,10\nFeb,20\n", false, false)
+	code := run([]string{"--export", path}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "Jan")
+
+	file, err := os.Open(path)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+	decoded, err := png.Decode(file)
+	require.NoError(t, err)
+	assert.Greater(t, decoded.Bounds().Dx(), 100)
+	assert.Greater(t, decoded.Bounds().Dy(), 100)
+}
+
+func TestRunExportRejectsUnknownExtension(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("month,revenue\nJan,10\n", false, false)
+	code := run([]string{"--export", "chart.webp"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "invalid export path")
+}
+
+func TestRunExportAndTUIConflict(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("month,revenue\nJan,10\n", true, true)
+	code := run([]string{"--tui", "--export", "chart.png"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "press e inside the TUI")
 }

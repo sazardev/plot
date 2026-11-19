@@ -95,6 +95,31 @@ func (m Model) loadCmd() tea.Cmd {
 	}
 }
 
+func (m Model) exportCmd(format string) tea.Cmd {
+	return func() (msg tea.Msg) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				slog.Error("recovered export panic",
+					"panic", fmt.Sprint(recovered),
+					"stack", string(debug.Stack()),
+				)
+				msg = exportedMsg{err: errors.New(m.opts.Locale.T("tui.export.unavailable", nil))}
+			}
+		}()
+		if m.opts.Export == nil || m.opts.Build == nil || m.dataset == nil || len(m.order) == 0 {
+			return exportedMsg{err: errors.New(m.opts.Locale.T("tui.export.unavailable", nil))}
+		}
+		chartType := m.order[m.current]
+		ds := domain.CloneDataset(m.dataset)
+		spec, err := m.opts.Build(ds, chartType, 80, 24)
+		if err != nil {
+			return exportedMsg{err: err}
+		}
+		path, err := m.opts.Export(spec, format)
+		return exportedMsg{path: path, err: err}
+	}
+}
+
 func sourceLabel(ds *domain.Dataset) string {
 	if ds == nil {
 		return ""

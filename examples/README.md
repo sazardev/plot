@@ -37,13 +37,14 @@ PL_BIN=/path/to/pl ./examples/run.sh line
 | 5 | `transforms` | `--filter`, `--sort`, `--rename`, multiple series |
 | 6 | `sqlite` | Read-only SQLite with inline query and query file |
 | 7 | `config` | TOML config for database, display and cache |
-| 8 | `tui` | Interactive TUI; `tab`, `?`, `q` |
+| 8 | `tui` | Interactive TUI on a single-series dataset; `tab`, `e`, `?`, `q` |
 | 9 | `delimiters` | Semicolon, tab and headerless CSV |
 | 10 | `edge` | Nulls, negatives, duplicate headers, ragged rows, mixed types |
 | 11 | `errors` | Expected failures and exit codes |
 | 12 | `cache` | Cold vs warm cache using a temporary cache directory |
-| 13 | `web` | Paths and instructions for the browser playground |
-| 14 | `all` | Run the main chart scenarios back to back |
+| 13 | `export` | Native PNG, JPG and PDF export, plus TUI export keys |
+| 14 | `web` | Paths and instructions for the browser playground |
+| 15 | `all` | Run the main chart scenarios back to back |
 
 ## Files
 
@@ -78,6 +79,10 @@ examples/
 
 The `.db` and `.xlsx` files are committed fixtures. Regenerate the database with `sqlite3 metrics.db < ...`
 if you want to change it.
+
+`tab` only cycles chart types that fit the current data. `traffic.csv` has three series, so only `line` is
+compatible; use `channels.csv` (the `tui` scenario) to see bar, pie and donut as well. The TUI status bar tells
+you when only one chart fits.
 
 ## Browser playground
 
@@ -124,7 +129,13 @@ CGO_ENABLED=0 go build -o pl ./cmd/pl
 ./pl examples/traffic.csv --type line
 ./pl examples/metrics.db --query 'select * from metrics'
 ./pl --config examples/config.toml
-./pl --tui examples/traffic.csv
+./pl --tui examples/channels.csv
+
+# export the same rendered frame from the CLI
+./pl examples/revenue.csv --type bar --export chart.png
+./pl examples/revenue.csv --type bar --export chart.pdf
+
+# in the TUI: press e, then p (PNG), j (JPG) or d (PDF)
 ```
 
 From the repository root, `pl --help` is the complete flag reference. The website guide is at

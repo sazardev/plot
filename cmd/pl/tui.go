@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/export"
 	"github.com/sazardev/plot/internal/i18n"
 	"github.com/sazardev/plot/internal/render"
 	"github.com/sazardev/plot/internal/storage"
@@ -75,6 +78,22 @@ func runTUI(
 		options.Height = height
 		return domain.BuildRenderSpec(ds, options)
 	}
+	exportChart := func(spec *domain.RenderSpec, format string) (string, error) {
+		frame, err := render.Chart(spec, theme)
+		if err != nil {
+			return "", err
+		}
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		filename := fmt.Sprintf("pl-%s-%s.%s", spec.ChartType, time.Now().Format("20060102-150405"), format)
+		path := filepath.Join(cwd, filename)
+		if err := export.WriteFrame(frame, path); err != nil {
+			return "", err
+		}
+		return path, nil
+	}
 
 	model := ui.New(ui.Options{
 		Load:        load,
@@ -87,6 +106,7 @@ func runTUI(
 		NoMotion:    tuiNoMotion(opts, stream.Env),
 		Color:       colorEnabled,
 		OnLoaded:    afterLoad,
+		Export:      exportChart,
 	})
 
 	program := tea.NewProgram(

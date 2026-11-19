@@ -17,6 +17,7 @@ type KeyMap struct {
 	Down      key.Binding
 	Left      key.Binding
 	Right     key.Binding
+	Export    key.Binding
 }
 
 // DefaultKeyMap builds the bindings with localized help text.
@@ -58,6 +59,10 @@ func DefaultKeyMap(loc *i18n.Localizer) KeyMap {
 			key.WithKeys("right", "l"),
 			key.WithHelp("right/l", loc.T("tui.key.right", nil)),
 		),
+		Export: key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", loc.T("tui.key.export", nil)),
+		),
 	}
 }
 
@@ -70,6 +75,6 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Quit, k.NextType, k.PrevType, k.Help, k.CloseHelp},
-		{k.Up, k.Down, k.Left, k.Right},
+		{k.Up, k.Down, k.Left, k.Right, k.Export},
 	}
 }

@@ -115,7 +115,7 @@ case "$scenario" in
       echo "The TUI needs stdin and stdout to be real terminals." >&2
       exit 1
     fi
-    "$BIN" --tui "$EXAMPLES/traffic.csv" --title "Traffic by source"
+    "$BIN" --tui "$EXAMPLES/channels.csv" --title "Sessions by channel"
     ;;
   9|delimiters)
     ensure_bin
@@ -159,7 +159,21 @@ case "$scenario" in
     printf 'Cache directory: %s\n' "$cache_dir/pl"
     printf 'The chart output is identical; cache work never changes it.\n'
     ;;
-  13|web|formats)
+  13|export)
+    ensure_bin
+    export_dir="$(mktemp -d)"
+    heading "Native export · CLI"
+    "$BIN" "$EXAMPLES/revenue.csv" --type bar --title "Revenue by month" \
+      --export "$export_dir/revenue.png" >/dev/null
+    "$BIN" "$EXAMPLES/revenue.csv" --type bar --title "Revenue by month" \
+      --export "$export_dir/revenue.jpg" >/dev/null
+    "$BIN" "$EXAMPLES/revenue.csv" --type bar --title "Revenue by month" \
+      --export "$export_dir/revenue.pdf" >/dev/null
+    ls -lh "$export_dir"
+    printf 'Exported files: %s\n' "$export_dir"
+    printf 'TUI export: ./examples/run.sh tui, then e → p (PNG), j (JPG) or d (PDF).\n'
+    ;;
+  14|web|formats)
     heading "Browser playground files"
     cat <<EOF
 Open: https://sazardev.github.io/plot/#playground
@@ -179,7 +193,7 @@ Serve the site locally:
   open http://localhost:8765/
 EOF
     ;;
-  14|all)
+  15|all)
     "$0" bar
     "$0" line
     "$0" donut

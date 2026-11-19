@@ -41,6 +41,9 @@ type Options struct {
 	// OnLoaded runs after the first loaded frame is scheduled. The application
 	// uses it for best-effort cache writes, which must stay outside Update.
 	OnLoaded func() tea.Cmd
+	// Export writes the current chart in format (png, jpg or pdf) and returns
+	// the path. It runs inside a tea.Cmd.
+	Export func(*domain.RenderSpec, string) (string, error)
 }
 
 // Model is the single-screen plot view.
@@ -66,6 +69,11 @@ type Model struct {
 
 	showHelp   bool
 	helpOffset int
+
+	exporting  bool
+	lastExport string
+	exportErr  error
+	notice     string
 
 	animFrame  int
 	animFrames int
@@ -147,6 +155,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showHelp = false
 		m.help.ShowAll = false
 		m.helpOffset = 0
+		m.exporting = false
+		m.lastExport = ""
+		m.exportErr = nil
+		m.notice = ""
 		m.animFrame = 0
 		m.animFrames = animationFrames
 		m.animating = !m.opts.NoMotion
@@ -165,6 +177,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.err = msg.err
 		m.exit = 1
+		return m, nil
+
+	case exportedMsg:
+		m.exporting = false
+		m.exportErr = msg.err
+		if msg.err == nil {
+			m.lastExport = msg.path
+		} else {
+			m.lastExport = ""
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -193,9 +215,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.notice = ""
+	if m.exporting {
+		switch msg.String() {
+		case "esc", "e":
+			m.exporting = false
+			m.exportErr = nil
+			return m, nil
+		case "p":
+			m.exporting = false
+			m.exportErr = nil
+			return m, m.exportCmd("png")
+		case "j":
+			m.exporting = false
+			m.exportErr = nil
+			return m, m.exportCmd("jpg")
+		case "d":
+			m.exporting = false
+			m.exportErr = nil
+			return m, m.exportCmd("pdf")
+		}
+		if keyMatches(msg, m.keys.Quit) {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 	switch {
 	case keyMatches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case keyMatches(msg, m.keys.Export):
+		if m.loading || m.err != nil || m.dataset == nil || len(m.order) == 0 {
+			return m, nil
+		}
+		m.exporting = true
+		m.showHelp = false
+		m.help.ShowAll = false
+		m.exportErr = nil
+		m.lastExport = ""
+		return m, nil
 	case keyMatches(msg, m.keys.NextType):
 		return m.cycle(1)
 	case keyMatches(msg, m.keys.PrevType):
@@ -227,9 +284,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) cycle(delta int) (tea.Model, tea.Cmd) {
-	if len(m.order) < 2 || m.err != nil || m.loading {
+	if m.err != nil || m.loading {
 		return m, nil
 	}
+	if len(m.order) < 2 {
+		if len(m.order) == 1 {
+			m.notice = m.opts.Locale.T("tui.only_compatible", map[string]any{"Type": string(m.order[0])})
+		}
+		return m, nil
+	}
+	m.lastExport = ""
+	m.exportErr = nil
 	m.current = (m.current + delta + len(m.order)) % len(m.order)
 	m.animFrame = 0
 	m.animFrames = typeChangeFrames
@@ -324,6 +389,15 @@ func (m Model) status() string {
 	if m.loading {
 		return loc.T("tui.loading_status", nil)
 	}
+	if m.exportErr != nil {
+		return loc.T("tui.export.failed", map[string]any{"Detail": domain.SanitizeText(m.exportErr.Error())})
+	}
+	if m.lastExport != "" {
+		return loc.T("tui.export.done", map[string]any{"Path": domain.SanitizeText(m.lastExport)})
+	}
+	if m.notice != "" {
+		return m.notice
+	}
 	view, ok := m.currentView()
 	if !ok {
 		return ""
@@ -345,6 +419,13 @@ func (m Model) body(width, height int) string {
 	loc := m.opts.Locale
 	if m.loading {
 		text := m.spinner.View() + " " + loc.T("tui.loading", map[string]any{"Source": m.sourceName()})
+		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, text), width, height)
+	}
+	if m.exporting {
+		text := loc.T("tui.export.title", nil) + "\n\n" + loc.T("tui.export.hint", nil)
+		if m.exportErr != nil {
+			text += "\n\n" + loc.T("tui.export.failed", map[string]any{"Detail": domain.SanitizeText(m.exportErr.Error())})
+		}
 		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, text), width, height)
 	}
 	if m.err != nil {

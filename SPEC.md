@@ -300,9 +300,9 @@ animations.
 - Given TUI mode on a TTY, then the alternate screen is used, the cursor is hidden while running, and the view has:
   a title/source header, a rounded chart frame, a status bar and a one-line help bar.
 - Keys: `q`/`Ctrl+C` quit; `tab`/`shift+tab` cycle compatible chart types; arrows and `hjkl` scroll overflowing
-  content (the full help panel; charts are fit to the viewport and do not scroll); `?` toggles full help; `esc`
-  closes help. Every binding is a `key.Binding` with help text; no Alt/function keys are required. Mouse capture is
-  not enabled in v1.
+  content (the full help panel; charts are fit to the viewport and do not scroll); `e` opens export; `?` toggles
+  full help; `esc` closes help. Every binding is a `key.Binding` with help text; no Alt/function keys are required.
+  Mouse capture is not enabled in v1.
 - Given a chart-type change, the new chart redraws in place with a highlight/fade of at most 150 ms; there is no
   sliding screen transition (DESIGN.md). First paint reveals marks over at most 400 ms at ≤30 fps.
 - Reduced motion: `--no-motion`, `NO_COLOR`, `TERM=dumb`, or `CI` set ⇒ no animation; the first frame is static.
@@ -360,6 +360,17 @@ re-inference.
 - SQLite cache connections use WAL, `foreign_keys=ON` and a short `busy_timeout` (250 ms); on lock/busy, skip the
   cache rather than stall the frame. Schema migrations are embedded and applied once per schema version.
 - A cache hit and a cache miss produce byte-identical output for the same inputs and options.
+
+**FR-14 — chart export.** The system must write the exact rendered CLI/TUI frame to an image or PDF without a
+browser or external converter.
+
+- `--export <path>` writes the same chart printed to stdout; the extension selects PNG (`.png`), JPEG (`.jpg`,
+  `.jpeg`) or PDF (`.pdf`). An unsupported extension is a usage error (`2`); a write failure is `1`.
+- In TUI mode, `e` opens an export panel; `p`, `j` and `d` write PNG, JPG and PDF respectively to the current
+  directory, and `esc` cancels. The status bar reports the resulting path.
+- Exports preserve ANSI foreground colors, braille/block/box glyphs, null gaps, titles and legends. A plain
+  (non-TTY) CLI render exported to a file still keeps the automatic palette unless `--color=never` was requested.
+- Export is local and deterministic; it never requires network access, a plotting library or a browser runtime.
 
 ## 7. Non-functional requirements
 
@@ -499,6 +510,7 @@ pl --help | --version
 | `--no-motion` | boolean | `false` | FR-11 |
 | `--no-cache` | boolean | `false` | FR-13 |
 | `--cache-dir` | directory path | `os.UserCacheDir()/pl` | FR-13 |
+| `--export` | path ending in `.png`, `.jpg`, `.jpeg` or `.pdf` | none | FR-14 |
 | `--config` | TOML path | `os.UserConfigDir()/pl/config.toml` | §9.4 |
 | `--help`, `-h` | boolean | — | FR-12 |
 | `--version` | boolean | — | FR-12 |
@@ -578,6 +590,8 @@ psql -c 'select day, signups from metrics' --csv | pl
 pl sales.csv
 pl sales.csv --type bar --label month --columns revenue --sort revenue:desc --title 'Revenue by month'
 pl sales.csv --filter 'region=EU' --filter 'revenue>=1000' --sort revenue:desc
+pl sales.csv --export chart.png
+pl sales.csv --export chart.pdf
 pl sales.csv --rename revenue=Revenue --columns revenue,orders --type line
 pl --db metrics.db --query 'select day, signups from metrics order by day' --type line
 pl --tui sales.csv
@@ -870,6 +884,7 @@ painting, and reduced-motion rules. The added runtime dependencies are the pure-
 | Storage | Temp SQLite with migrations; read-only source; missing/non-SQLite/locked driver errors verbatim; timeout message; cache cold/warm/corrupt/locked/unwritable; `0600`/`0700` permissions; hit/miss output identical. |
 | Performance | Benchmarks for 10k×5 cold CLI, warm CLI and TUI first frame; p95 against NFR-1; RSS against NFR-2; numbers recorded in the milestone. |
 | Determinism | Render the same spec 100 times and compare bytes; run with cache on/off and compare; stable-sort tie cases. |
+| Export | PNG/JPG/PDF magic bytes, image dimensions, ANSI/braille/block glyph rendering, TUI export keys and path status. |
 | i18n | A test loads every `active.*.toml`, checks every message ID/template used by the code, and verifies fallback to English. |
 | Quality gates | `go build ./...`, `gofmt -l -w .`, `go vet ./...`, `golangci-lint run`, `go test ./...`, `go test -race ./...`, goldens committed, `sqlc generate` leaves no diff, `goreleaser check`. |
 

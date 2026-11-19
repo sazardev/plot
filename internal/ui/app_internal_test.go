@@ -198,3 +198,48 @@ func TestTUICommandPanicBecomesErrorPanel(t *testing.T) {
 	require.Error(t, loadErr.err)
 	require.Contains(t, loadErr.err.Error(), loc.T("tui.error.internal", nil))
 }
+
+func TestTUIExportMenuAndCommand(t *testing.T) {
+	t.Parallel()
+
+	loc, err := i18n.New("en")
+	require.NoError(t, err)
+	model := internalModel(t, 80, 24)
+	model.opts.Locale = loc
+	chartType := model.order[0]
+	model.opts.Build = func(*domain.Dataset, domain.ChartType, int, int) (*domain.RenderSpec, error) {
+		return model.views[chartType].spec, nil
+	}
+	model.opts.Export = func(_ *domain.RenderSpec, format string) (string, error) {
+		return "/tmp/chart." + format, nil
+	}
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	model = updated.(Model)
+	require.True(t, model.exporting)
+	require.Contains(t, model.View(), "Export current chart")
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	model = updated.(Model)
+	require.False(t, model.exporting)
+	require.NotNil(t, cmd)
+
+	msg := cmd()
+	exported, ok := msg.(exportedMsg)
+	require.True(t, ok)
+	require.NoError(t, exported.err)
+	require.Equal(t, "/tmp/chart.png", exported.path)
+
+	updated, _ = model.Update(exported)
+	model = updated.(Model)
+	require.Contains(t, model.status(), "/tmp/chart.png")
+}
+
+func TestTUITabExplainsSingleCompatibleChart(t *testing.T) {
+	t.Parallel()
+
+	model := internalModel(t, 80, 24)
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = updated.(Model)
+	require.Contains(t, model.status(), "only bar fits")
+}

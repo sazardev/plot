@@ -19,6 +19,7 @@ rendering and configuration are plain Go packages outside the UI.
 | Components | `github.com/charmbracelet/bubbles` (spinner, help, key) | Tested building blocks with key bindings and help |
 | Styling | `github.com/charmbracelet/lipgloss` | Declarative styles, layout, adaptive colors |
 | Renderer | `internal/render` (plain Go) | Pure chart layout, braille/block glyphs and ANSI; no Bubble Tea or Lip Gloss |
+| Export | `internal/export` + `golang.org/x/image` + `github.com/go-pdf/fpdf` | PNG/JPG/PDF files from the exact CLI/TUI frame; no browser or headless tool |
 | Input | `encoding/csv` with detection + `github.com/mattn/go-runewidth` | RFC 4180 parsing and terminal cell widths |
 | Database source | `modernc.org/sqlite` (pure Go, CGO-free) | Read-only local SQLite; PostgreSQL/MySQL arrive through `psql --csv`/`mysql --batch` pipes |
 | Cache | SQLite + `sqlc` + `goose`-authored migrations | Typed cache queries, versioned schema, WAL, disposable data |
@@ -42,6 +43,7 @@ internal/
   domain/                         plain Go types and rules: Dataset, inference, transforms, RenderSpec
   storage/                        delimited input, read-only SQLite source, disposable SQLite cache
   render/                         pure chart layout, glyphs, ANSI theme and locale number formatting
+  export/                         terminal-frame rasterizer and PNG/JPG/PDF writer
   ui/                             Bubble Tea single-screen root: app.go, keys.go, styles.go, commands.go
     testdata/                     TUI golden files (updated with -update-tui)
   i18n/                           bundle setup plus active.<lang>.toml messages (go:embed)
@@ -127,6 +129,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 | Coverage | `go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out` |
 | Install hooks | `lefthook install` |
 | Serve the site | `python3 -m http.server -d docs 8765` |
+| Export a chart | `./pl data.csv --export chart.png` |
 | Run examples | `./examples/run.sh` or `./examples/run.sh bar` |
 
 ## Testing
@@ -150,6 +153,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 - Charm libraries for the UI, `modernc.org/sqlite` for SQLite, `BurntSushi/toml` for config, go-i18n/x-text for localization, and the standard library for the rest.
 - Allowed: the table above. Anything else needs a reason in the PR.
 - The browser playground's Chart.js, SheetJS, sql.js and jsPDF are vendored under `docs/assets/vendor` with their licenses; they are not Go dependencies and must never be imported by `cmd/` or `internal/`.
+- Export dependencies are Go-only: `golang.org/x/image` for the monospaced raster and `github.com/go-pdf/fpdf` for PDF. Both are MIT/BSD compatible and must stay in `internal/export`.
 - Do NOT use: tview/termui/gocui alongside Bubble Tea (two UI models), `fmt.Print` while the program runs (corrupts the screen), global mutable state shared between components, goroutines that write to the model directly (send a message with `p.Send` or a command instead).
 
 ## Rules for agents
