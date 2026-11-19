@@ -97,6 +97,9 @@ func New(opts Options) Model {
 	}
 	spin := spinner.New()
 	spin.Spinner = spinner.Dot
+	if opts.Theme.ASCII {
+		spin.Spinner = spinner.Line
+	}
 	return Model{
 		opts:    opts,
 		styles:  styles,
