@@ -152,6 +152,14 @@ const (
 	GlyphASCII   GlyphMode = "ascii"
 )
 
+// PieSlice is one non-zero slice of a pie or donut.
+type PieSlice struct {
+	Label     string
+	Value     float64
+	ColorSlot int
+	Marker    int
+}
+
 // RenderSpec is the sole input to the renderer.
 type RenderSpec struct {
 	ChartType   ChartType
@@ -160,6 +168,7 @@ type RenderSpec struct {
 	LabelKind   LabelKind
 	Labels      []string
 	Series      []Series
+	PieSlices   []PieSlice
 	Width       int
 	Height      int
 	Title       string

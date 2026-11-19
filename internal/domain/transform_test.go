@@ -494,3 +494,60 @@ func TestFilterTimeAndBooleanColumns(t *testing.T) {
 	require.Len(t, spec.Series, 1)
 	assert.Equal(t, 30.0, spec.Series[0].Points[0].Y)
 }
+
+func TestPieCompatibilityAndZeroSlices(t *testing.T) {
+	t.Parallel()
+
+	ds := dataset(
+		[]string{"month", "revenue"},
+		[]string{"Jan", "10"},
+		[]string{"Feb", "0"},
+		[]string{"Mar", "20"},
+	)
+	spec := build(t, ds, domain.BuildOptions{ChartType: "pie"})
+	require.Len(t, spec.PieSlices, 2)
+	assert.Equal(t, "Jan", spec.PieSlices[0].Label)
+	assert.Equal(t, "Mar", spec.PieSlices[1].Label)
+	assert.True(t, hasWarning(ds.Warnings, "cli.warn.zero_slices"))
+}
+
+func TestPieRejectsNegativeDuplicateAndTooManySlices(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		labels []string
+		values []string
+	}{
+		{name: "negative", labels: []string{"Jan", "Feb"}, values: []string{"10", "-2"}},
+		{name: "duplicate labels", labels: []string{"Jan", "Jan"}, values: []string{"10", "20"}},
+		{name: "too many", labels: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"}, values: []string{"1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"}},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rows := make([][]string, 0, len(tt.labels))
+			for i := range tt.labels {
+				rows = append(rows, []string{tt.labels[i], tt.values[i]})
+			}
+			ds := dataset([]string{"label", "value"}, rows...)
+			require.NoError(t, domain.Infer(ds))
+			_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "pie", Width: 80, Height: 24})
+			assert.ErrorIs(t, err, domain.ErrIncompatibleChart)
+		})
+	}
+}
+
+func TestDonutRequiresOneSeries(t *testing.T) {
+	t.Parallel()
+
+	ds := dataset(
+		[]string{"month", "revenue", "cost"},
+		[]string{"Jan", "10", "4"},
+		[]string{"Feb", "20", "5"},
+	)
+	require.NoError(t, domain.Infer(ds))
+	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "donut", Width: 80, Height: 24})
+	assert.ErrorIs(t, err, domain.ErrIncompatibleChart)
+}

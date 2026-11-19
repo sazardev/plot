@@ -243,7 +243,7 @@ func TestBuildRenderSpecRejectsIncompatibleBar(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrIncompatibleChart)
 }
 
-func TestBuildRenderSpecRejectsUnsupportedPieForNow(t *testing.T) {
+func TestBuildRenderSpecBuildsPieSlices(t *testing.T) {
 	t.Parallel()
 
 	ds := dataset(
@@ -253,9 +253,12 @@ func TestBuildRenderSpecRejectsUnsupportedPieForNow(t *testing.T) {
 	)
 	require.NoError(t, domain.Infer(ds))
 
-	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "pie", Width: 80, Height: 24})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrUnsupportedChart)
+	spec, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "pie", Width: 80, Height: 24})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ChartPie, spec.ChartType)
+	require.Len(t, spec.PieSlices, 2)
+	assert.Equal(t, "Jan", spec.PieSlices[0].Label)
+	assert.Equal(t, 10.0, spec.PieSlices[0].Value)
 }
 
 func TestBuildRenderSpecRejectsHeaderOnlyInput(t *testing.T) {
@@ -311,9 +314,9 @@ func TestBuildRenderSpecRejectsUnknownChartType(t *testing.T) {
 	)
 	require.NoError(t, domain.Infer(ds))
 
-	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "donut", Width: 80, Height: 24})
+	_, err := domain.BuildRenderSpec(ds, domain.BuildOptions{ChartType: "scatter", Width: 80, Height: 24})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrUnsupportedChart)
+	assert.ErrorIs(t, err, domain.ErrUsage)
 }
 
 func TestInferRejectsEmptyDataset(t *testing.T) {

@@ -374,6 +374,13 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 	if err != nil {
 		return nil, err
 	}
+	var pieSlices []PieSlice
+	if chartType == ChartPie || chartType == ChartDonut {
+		pieSlices, err = buildPieSlices(ds, series, labels, chartType)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if strings.TrimSpace(opts.ChartType) == "" && chartType == ChartLine && len(series) == 1 && selection.labelKind == LabelCategorical {
 		ds.Warnings = append(ds.Warnings, Warning{
 			ID:   "cli.warn.ordinal_axis",
@@ -399,6 +406,7 @@ func BuildRenderSpec(ds *Dataset, opts BuildOptions) (*RenderSpec, error) {
 		LabelKind:   selection.labelKind,
 		Labels:      labels,
 		Series:      series,
+		PieSlices:   pieSlices,
 		Width:       opts.Width,
 		Height:      opts.Height,
 		Title:       title,
@@ -427,10 +435,84 @@ func resolveChartType(requested string, series []Series, labelKind LabelKind, ro
 		}
 		return ChartBar, nil
 	case "pie", "donut":
-		return "", &UnsupportedChartError{Type: requested}
+		if len(series) != 1 {
+			return "", &IncompatibleChartError{
+				Type:   ChartType(requested),
+				Reason: "pie and donut charts need exactly one value series",
+			}
+		}
+		return ChartType(requested), nil
 	default:
-		return "", &UsageError{Detail: fmt.Sprintf("unknown chart type %q; use line or bar", requested)}
+		return "", &UsageError{Detail: fmt.Sprintf("unknown chart type %q; use line, bar, pie or donut", requested)}
 	}
+}
+
+func buildPieSlices(ds *Dataset, series []Series, labels []string, chartType ChartType) ([]PieSlice, error) {
+	if len(series) != 1 {
+		return nil, &IncompatibleChartError{
+			Type:   chartType,
+			Reason: "pie and donut charts need exactly one value series",
+		}
+	}
+
+	slices := make([]PieSlice, 0, len(series[0].Points))
+	seen := make(map[string]struct{}, len(series[0].Points))
+	zeros := 0
+	for i, point := range series[0].Points {
+		if point.Null {
+			continue
+		}
+		if math.IsNaN(point.Y) || math.IsInf(point.Y, 0) || point.Y < 0 {
+			return nil, &IncompatibleChartError{
+				Type:   chartType,
+				Reason: "slice values must be finite and non-negative",
+			}
+		}
+		if point.Y == 0 {
+			zeros++
+			continue
+		}
+		label := ""
+		if i < len(labels) {
+			label = strings.TrimSpace(labels[i])
+		}
+		if label == "" {
+			label = "#" + strconv.Itoa(i+1)
+		}
+		if _, exists := seen[label]; exists {
+			return nil, &IncompatibleChartError{
+				Type:   chartType,
+				Reason: fmt.Sprintf("slice labels must be unique (%q appears more than once)", label),
+			}
+		}
+		seen[label] = struct{}{}
+		slices = append(slices, PieSlice{
+			Label:     label,
+			Value:     point.Y,
+			ColorSlot: len(slices) % 8,
+			Marker:    len(slices) % 8,
+		})
+	}
+
+	if len(slices) < 2 {
+		return nil, &IncompatibleChartError{
+			Type:   chartType,
+			Reason: "pie and donut charts need at least two non-zero slices",
+		}
+	}
+	if len(slices) > 12 {
+		return nil, &IncompatibleChartError{
+			Type:   chartType,
+			Reason: fmt.Sprintf("too many slices (%d); the maximum is 12, use a bar chart", len(slices)),
+		}
+	}
+	if zeros > 0 {
+		ds.Warnings = append(ds.Warnings, Warning{
+			ID:   "cli.warn.zero_slices",
+			Data: map[string]string{"Count": strconv.Itoa(zeros)},
+		})
+	}
+	return slices, nil
 }
 
 func sourceTitle(ds *Dataset) string {

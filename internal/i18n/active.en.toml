@@ -27,9 +27,9 @@ other = "Chart types"
 
 ["cli.help.types"]
 description = "Supported chart types and the default rule."
-other = """  line, bar, plot (alias), graph (alias)
+other = """  line, bar, pie, donut; aliases: plot (line), graph (bar)
   Default: bar for one categorical series with at most 30 rows, otherwise line.
-  pie and donut are accepted values but are not implemented yet."""
+  Pie/donut need exactly one non-negative series with 2-12 unique slices."""
 
 ["cli.help.flags_label"]
 description = "Label before the flag table."
@@ -56,7 +56,7 @@ other = "  0 success; 1 data/environment error; 2 usage error; 3 source error; 1
 
 ["cli.flag.type"]
 description = "Flag description for --type."
-other = "chart type: line, bar, plot or graph"
+other = "chart type: line, bar, pie or donut (aliases plot, graph)"
 
 ["cli.flag.label"]
 description = "Flag description for --label."
@@ -168,7 +168,7 @@ other = "run 'pl --help' for usage"
 
 ["cli.error.unsupported_chart"]
 description = "A valid chart type is not implemented yet."
-other = "chart type {{.Type}} is not implemented yet; use line or bar"
+other = "chart type {{.Type}} is not implemented yet; use line, bar, pie or donut"
 
 ["cli.error.incompatible_chart"]
 description = "A chart type cannot render the selected data."
@@ -244,7 +244,7 @@ other = "invalid color mode {{.Value}}; use auto, always or never"
 
 ["cli.error.invalid_type"]
 description = "The chart type value is invalid."
-other = "invalid chart type {{.Value}}; use line, bar, plot or graph"
+other = "invalid chart type {{.Value}}; use line, bar, pie, donut, plot or graph"
 
 ["cli.error.width"]
 description = "The width flag is out of range."
@@ -273,6 +273,10 @@ other = "record {{.Line}}: expected {{.Expected}} fields, got {{.Got}}; padded o
 ["cli.warn.multiple_labels"]
 description = "Several label columns were found; the first was used."
 other = "multiple label columns ({{.Columns}}); using {{.Used}}"
+
+["cli.warn.zero_slices"]
+description = "Zero-valued pie or donut slices were omitted."
+other = "{{.Count}} zero-valued slice(s) omitted"
 
 ["cli.warn.ordinal_axis"]
 description = "Categorical data exceeded the bar threshold and uses row order."

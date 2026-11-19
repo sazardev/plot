@@ -17,11 +17,20 @@ const (
 
 // Chart renders one static frame. It is a pure function of spec and theme.
 func Chart(spec *domain.RenderSpec, theme Theme) (string, error) {
-	if spec == nil || len(spec.Series) == 0 {
+	if spec == nil {
 		return "", domain.ErrNoValues
 	}
 	if spec.Width < minWidth || spec.Height < minHeight {
 		return "", &domain.TooSmallError{Width: spec.Width, Height: spec.Height}
+	}
+	if spec.ChartType == domain.ChartPie || spec.ChartType == domain.ChartDonut {
+		if len(spec.PieSlices) == 0 {
+			return "", domain.ErrNoValues
+		}
+		return renderPie(spec, theme)
+	}
+	if len(spec.Series) == 0 {
+		return "", domain.ErrNoValues
 	}
 
 	r, err := newRenderer(spec, theme)

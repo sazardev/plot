@@ -237,3 +237,89 @@ func TestChartLongTitleIsTruncated(t *testing.T) {
 	assert.LessOrEqual(t, len([]rune(first)), spec.Width)
 	assert.Contains(t, first, "…")
 }
+
+func pieSpec(chartType domain.ChartType) *domain.RenderSpec {
+	return &domain.RenderSpec{
+		ChartType: chartType,
+		PieSlices: []domain.PieSlice{
+			{Label: "Jan", Value: 30, ColorSlot: 0, Marker: 0},
+			{Label: "Feb", Value: 20, ColorSlot: 1, Marker: 1},
+			{Label: "Mar", Value: 50, ColorSlot: 2, Marker: 2},
+		},
+		Width:     40,
+		Height:    12,
+		Title:     "stdin — pie",
+		GlyphMode: domain.GlyphUnicode,
+	}
+}
+
+func TestChartPieRendersLegendPercentagesAndSlices(t *testing.T) {
+	t.Parallel()
+
+	out, err := render.Chart(pieSpec(domain.ChartPie), render.Theme{})
+	require.NoError(t, err)
+	t.Log("\n" + out)
+
+	assert.Contains(t, out, "stdin — pie")
+	assert.Contains(t, out, "Jan")
+	assert.Contains(t, out, "Feb")
+	assert.Contains(t, out, "Mar")
+	assert.Contains(t, out, "%")
+	assert.True(t, strings.ContainsAny(out, "█▓▒░"))
+}
+
+func TestChartDonutRenders(t *testing.T) {
+	t.Parallel()
+
+	out, err := render.Chart(pieSpec(domain.ChartDonut), render.Theme{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, out)
+	assert.Contains(t, out, "%")
+}
+
+func TestChartPieASCII(t *testing.T) {
+	t.Parallel()
+
+	spec := pieSpec(domain.ChartPie)
+	spec.Title = "stdin - pie"
+	out, err := render.Chart(spec, render.Theme{ASCII: true})
+	require.NoError(t, err)
+	t.Log("\n" + out)
+
+	assert.NotContains(t, out, "█")
+	assert.NotContains(t, out, "▓")
+	assert.Contains(t, out, "%")
+	assert.True(t, strings.ContainsAny(out, "#%*+=-@:"))
+}
+
+func TestChartPieGoldens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		spec *domain.RenderSpec
+		file string
+	}{
+		{name: "pie", spec: pieSpec(domain.ChartPie), file: "pie_40x12.golden"},
+		{name: "donut", spec: pieSpec(domain.ChartDonut), file: "donut_40x12.golden"},
+		{
+			name: "pie ascii",
+			spec: func() *domain.RenderSpec {
+				spec := pieSpec(domain.ChartPie)
+				spec.Title = "stdin - pie"
+				return spec
+			}(),
+			file: "pie_ascii_40x12.golden",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			theme := render.Theme{ASCII: tt.spec.Title == "stdin - pie"}
+			out, err := render.Chart(tt.spec, theme)
+			require.NoError(t, err)
+			testutil.AssertGolden(t, filepath.Join("testdata", tt.file), []byte(out+"\n"))
+		})
+	}
+}

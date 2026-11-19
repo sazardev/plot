@@ -172,7 +172,7 @@ func TestRunInvalidFlags(t *testing.T) {
 		{name: "delimiter", args: []string{"--delimiter", ";;"}, want: "invalid delimiter"},
 		{name: "header conflict", args: []string{"--header", "--no-header"}, want: "use only one"},
 		{name: "unknown type", args: []string{"--type", "scatter"}, want: "unknown chart type"},
-		{name: "pie", args: []string{"--type", "pie"}, want: "not implemented yet"},
+		{name: "pie needs slices", args: []string{"--type", "pie"}, want: "at least two non-zero slices"},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -538,4 +538,48 @@ func TestRunTooManyExplicitSeries(t *testing.T) {
 
 	assert.Equal(t, exitUsage, code)
 	assert.Contains(t, errOut.String(), "maximum is 8")
+}
+
+func TestRunPieAndDonut(t *testing.T) {
+	t.Parallel()
+
+	input := "month,revenue\nJan,30\nFeb,20\nMar,50\n"
+	for _, chartType := range []string{"pie", "donut"} {
+		chartType := chartType
+		t.Run(chartType, func(t *testing.T) {
+			t.Parallel()
+			stream, out, errOut := testIO(input, false, false)
+			code := run([]string{"--type", chartType}, stream)
+			require.Equal(t, 0, code)
+			assert.Empty(t, errOut.String())
+			assert.Contains(t, out.String(), "Jan")
+			assert.Contains(t, out.String(), "30.0%")
+		})
+	}
+}
+
+func TestRunPieRejectsNegativeValues(t *testing.T) {
+	t.Parallel()
+
+	input := "month,revenue\nJan,30\nFeb,-20\n"
+	stream, out, errOut := testIO(input, false, false)
+	code := run([]string{"--type", "pie"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Empty(t, out.String())
+	assert.Contains(t, errOut.String(), "non-negative")
+}
+
+func TestRunPieDropsZeroSlicesWithWarning(t *testing.T) {
+	t.Parallel()
+
+	input := "month,revenue\nJan,30\nFeb,0\nMar,70\n"
+	stream, out, errOut := testIO(input, false, false)
+	code := run([]string{"--type", "pie"}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "Jan")
+	assert.Contains(t, out.String(), "Mar")
+	assert.NotContains(t, out.String(), "Feb")
+	assert.Contains(t, errOut.String(), "zero-valued slice")
 }

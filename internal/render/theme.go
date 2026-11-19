@@ -52,3 +52,13 @@ func (t Theme) axisGlyphs() (vertical, horizontal, corner, tick, baseline string
 
 var unicodeMarkers = []string{"●", "▲", "■", "◆", "▼", "○", "◇", "✚"}
 var asciiMarkers = []string{"o", "^", "#", "*", "v", "O", "+", "x"}
+
+func (t Theme) pieGlyph(slot int) string {
+	if t.ASCII {
+		return asciiPieGlyphs[slot%len(asciiPieGlyphs)]
+	}
+	return unicodePieGlyphs[slot%len(unicodePieGlyphs)]
+}
+
+var unicodePieGlyphs = []string{"█", "▓", "▒", "░", "▚", "▞", "▙", "▛"}
+var asciiPieGlyphs = []string{"#", "%", "*", "+", "=", "-", "@", ":"}
