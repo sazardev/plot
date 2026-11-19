@@ -792,3 +792,77 @@ func TestRunHelpListsTUIFlags(t *testing.T) {
 	assert.Contains(t, out.String(), "--tui")
 	assert.Contains(t, out.String(), "--no-motion")
 }
+
+func TestRunTUIFallsBackWhenStdoutRedirected(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "data.csv")
+	require.NoError(t, os.WriteFile(path, []byte("month,revenue\nJan,10\nFeb,20\n"), 0o600))
+
+	stream, out, errOut := testIO("", true, false)
+	code := run([]string{"--tui", path}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Contains(t, out.String(), "Jan")
+	assert.Contains(t, errOut.String(), "TUI needs a terminal")
+}
+
+func TestRunSanitizesControlCharactersInLabels(t *testing.T) {
+	t.Parallel()
+
+	input := "month,revenue\n\"Ja\x1b[31mn\",10\nFeb,20\n"
+	stream, out, errOut := testIO(input, false, false)
+	code := run(nil, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.NotContains(t, out.String(), "\x1b")
+	assert.Contains(t, out.String(), "Ja [31mn")
+}
+
+func TestRunMultipleFilesWithTransforms(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	first := filepath.Join(dir, "one.csv")
+	second := filepath.Join(dir, "two.csv")
+	require.NoError(t, os.WriteFile(first, []byte("month,revenue,cost\nJan,10,4\nFeb,30,8\n"), 0o600))
+	require.NoError(t, os.WriteFile(second, []byte("month,revenue,cost\nMar,20,2\n"), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{
+		first, second,
+		"--label", "month",
+		"--columns", "revenue",
+		"--filter", "revenue>=20",
+		"--sort", "revenue:desc",
+		"--rename", "revenue=Revenue",
+	}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "one.csv (+1 more)")
+	assert.Contains(t, out.String(), "Revenue")
+	assert.Contains(t, out.String(), "Feb")
+	assert.Contains(t, out.String(), "Mar")
+	assert.NotContains(t, out.String(), "Jan")
+}
+
+func TestRunSQLiteBLOBandFilter(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{
+		"--db", path,
+		"--query", "select x'0102' as payload, day, signups from metrics",
+		"--label", "payload",
+		"--columns", "signups",
+		"--filter", "signups>=4",
+	}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "<blob 2 byt")
+}

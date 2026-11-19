@@ -115,3 +115,15 @@ func TestTUINoColorStylesHaveNoForeground(t *testing.T) {
 	require.NotContains(t, styles.Frame.Render("x"), "\x1b[")
 	require.Contains(t, styles.Frame.Render("x"), "+")
 }
+
+func TestTUIWarningsInStatusAndHelp(t *testing.T) {
+	model := internalModel(t, 80, 24)
+	for chartType, view := range model.views {
+		view.warnings = []domain.Warning{{ID: "cli.warn.zero_slices", Data: map[string]string{"Count": "1"}}}
+		model.views[chartType] = view
+	}
+	require.Contains(t, model.View(), "1 warnings")
+	model.showHelp = true
+	model.help.ShowAll = true
+	require.Contains(t, model.View(), "zero-valued")
+}
