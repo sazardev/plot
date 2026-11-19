@@ -20,10 +20,14 @@ func styleFunc(style lipgloss.Style) render.StyleFunc {
 	return func(s string) string { return style.Render(s) }
 }
 
+// The TUI uses standard ANSI color slots, not fixed RGB values. The terminal
+// (and therefore the user's system theme) owns the actual palette. This keeps
+// the TUI consistent with the terminal and lets exported screenshots resolve
+// the same slots through termtheme.
 var (
-	primaryColor = lipgloss.AdaptiveColor{Light: "#7D56F4", Dark: "#9B7CFF"}
-	mutedColor   = lipgloss.AdaptiveColor{Light: "#8A8A8A", Dark: "#6C6C6C"}
-	dangerColor  = lipgloss.AdaptiveColor{Light: "#E0245E", Dark: "#FF5F87"}
+	primaryColor = lipgloss.Color("5") // magenta
+	mutedColor   = lipgloss.Color("8") // bright black
+	dangerColor  = lipgloss.Color("1") // red
 )
 
 // ThemeStyles keeps the TUI chrome readable in color, NO_COLOR and ASCII
@@ -68,14 +72,14 @@ func NewStyles(color, ascii bool) ThemeStyles {
 }
 
 var seriesColors = []string{
-	"#E69F00", // orange
-	"#56B4E9", // sky blue
-	"#009E73", // bluish green
-	"#F0E442", // yellow
-	"#0072B2", // blue
-	"#D55E00", // vermillion
-	"#CC79A7", // reddish purple
-	"#999999", // grey
+	"3",  // yellow
+	"6",  // cyan
+	"2",  // green
+	"5",  // magenta
+	"4",  // blue
+	"1",  // red
+	"13", // bright magenta
+	"8",  // bright black
 }
 
 // NewTheme builds the renderer theme. All colors live here (DESIGN.md); views

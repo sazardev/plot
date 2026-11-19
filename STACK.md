@@ -17,9 +17,9 @@ rendering and configuration are plain Go packages outside the UI.
 | CLI entry | `github.com/spf13/cobra` + `pflag` | Flags, help, usage errors and exit-code mapping |
 | TUI runtime | `github.com/charmbracelet/bubbletea` (`--tui` only) | Elm architecture: predictable state, side effects as commands |
 | Components | `github.com/charmbracelet/bubbles` (spinner, help, key) | Tested building blocks with key bindings and help |
-| Styling | `github.com/charmbracelet/lipgloss` | Declarative styles, layout, adaptive colors |
+| Styling | `github.com/charmbracelet/lipgloss` | Declarative styles, layout; terminal ANSI palette inherited by TUI |
 | Renderer | `internal/render` (plain Go) | Pure chart layout, braille/block glyphs and ANSI; no Bubble Tea or Lip Gloss |
-| Export | `internal/export` + `golang.org/x/image` + `github.com/go-pdf/fpdf` | PNG/JPG/PDF files from the exact CLI/TUI frame; no browser or headless tool |
+| Export | `internal/export` + `internal/termtheme` + `golang.org/x/image` + `github.com/go-pdf/fpdf` | PNG/JPG/PDF from the exact CLI/TUI frame, inheriting terminal palette and system font; no browser or headless tool |
 | Input | `encoding/csv` with detection + `github.com/mattn/go-runewidth` | RFC 4180 parsing and terminal cell widths |
 | Database source | `modernc.org/sqlite` (pure Go, CGO-free) | Read-only local SQLite; PostgreSQL/MySQL arrive through `psql --csv`/`mysql --batch` pipes |
 | Cache | SQLite + `sqlc` + `goose`-authored migrations | Typed cache queries, versioned schema, WAL, disposable data |
@@ -44,6 +44,7 @@ internal/
   storage/                        delimited input, read-only SQLite source, disposable SQLite cache
   render/                         pure chart layout, glyphs, ANSI theme and locale number formatting
   export/                         terminal-frame rasterizer and PNG/JPG/PDF writer
+  termtheme/                      terminal OSC palette detection and system font resolution
   ui/                             Bubble Tea single-screen root: app.go, keys.go, styles.go, commands.go
     testdata/                     TUI golden files (updated with -update-tui)
   i18n/                           bundle setup plus active.<lang>.toml messages (go:embed)
@@ -70,7 +71,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 - Every side effect is a `tea.Cmd` returning a typed message; errors come back as `errMsg{err}` and are shown, never `panic`.
 - Children are updated by the parent forwarding messages; the parent batches child commands with `tea.Batch`.
 - `tea.WindowSizeMsg` is stored in the root and passed down; components never assume a terminal size.
-- Styles and colors only from `ui/styles.go`; use `lipgloss.AdaptiveColor` so light and dark terminals both work.
+- Styles and colors only from `ui/styles.go`; use ANSI slots so the terminal/system scheme supplies light and dark values.
 - Key bindings are `key.Binding`s with help text; the help bubble shows them, so every key is discoverable.
 - The current TUI is one screen in `internal/ui`; split it into `ui/screens/plot/{model,update,view}.go` only when a second screen appears.
 - Cache connections: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=250`; keep writes short and best-effort.
@@ -153,7 +154,8 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 - Charm libraries for the UI, `modernc.org/sqlite` for SQLite, `BurntSushi/toml` for config, go-i18n/x-text for localization, and the standard library for the rest.
 - Allowed: the table above. Anything else needs a reason in the PR.
 - The browser playground's Chart.js, SheetJS, sql.js and jsPDF are vendored under `docs/assets/vendor` with their licenses; they are not Go dependencies and must never be imported by `cmd/` or `internal/`.
-- Export dependencies are Go-only: `golang.org/x/image` for the monospaced raster and `github.com/go-pdf/fpdf` for PDF. Both are MIT/BSD compatible and must stay in `internal/export`.
+- Export dependencies are Go-only: `golang.org/x/image` for the monospaced raster, `github.com/go-pdf/fpdf` for PDF, and `golang.org/x/sys` for terminal OSC reads. All are permissively licensed; terminal detection stays in `internal/termtheme`.
+- The terminal palette/font is inherited at runtime: `internal/termtheme` reads OSC 4/10/11 and resolves system monospace through fontconfig; `PL_EXPORT_FONT` and `PL_EXPORT_FONT_SIZE` are the explicit overrides.
 - Do NOT use: tview/termui/gocui alongside Bubble Tea (two UI models), `fmt.Print` while the program runs (corrupts the screen), global mutable state shared between components, goroutines that write to the model directly (send a message with `p.Send` or a command instead).
 
 ## Rules for agents

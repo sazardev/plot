@@ -148,13 +148,17 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 			})
 		}
 	}
+	exportOptions := export.DefaultOptions()
+	if opts.TUI || opts.Export != "" {
+		exportOptions = resolveExportOptions(stream)
+	}
 	if opts.TUI {
 		if !stream.InTTY || !stream.OutTTY {
 			if stream.Err != nil {
 				_, _ = fmt.Fprintln(stream.Err, loc.T("cli.warn.tui_fallback", nil))
 			}
 		} else {
-			return runTUI(args, opts, stream, loc, delimiter, headerMode, colorMode, colorEnabled, glyphMode, theme, cache)
+			return runTUI(args, opts, stream, loc, delimiter, headerMode, colorMode, colorEnabled, glyphMode, theme, exportOptions, cache)
 		}
 	}
 
@@ -186,7 +190,7 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 				return asAppError(renderErr, sourcePath, fromStdin)
 			}
 		}
-		if err := export.WriteFrame(exportFrame, opts.Export); err != nil {
+		if err := export.WriteFrameWithOptions(exportFrame, opts.Export, exportOptions); err != nil {
 			return newAppError(exitData, "cli.error.export", map[string]any{
 				"Path":   domain.SanitizeText(opts.Export),
 				"Detail": domain.SanitizeText(err.Error()),

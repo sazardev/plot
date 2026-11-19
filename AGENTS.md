@@ -50,6 +50,7 @@ internal/config/    strict TOML config, path resolution, duration/size parsing
 internal/storage/   delimited input (stdin/CSV), read-only SQLite source, disposable SQLite cache
 internal/render/    pure chart layout, glyphs and ANSI; no Bubble Tea, no Lip Gloss
 internal/export/    raster/PDF export of rendered terminal frames (PNG, JPG, PDF)
+internal/termtheme/ terminal OSC palette detection and system font resolution
 internal/ui/        app.go root model, keys.go, styles.go, msgs.go, commands.go
 internal/ui/testdata/  TUI golden files (updated with -update-tui)
 internal/i18n/      bundle setup plus active.<lang>.toml messages (go:embed)
@@ -73,7 +74,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 
 - File organisation: one file = one responsibility. The current TUI is a single screen in `internal/ui`; split it into `screens/plot/{model,update,view}.go` when a second screen appears.
 - All styling lives in `internal/ui/styles.go`; all bindings in `internal/ui/keys.go`; every side effect is a `tea.Cmd` constructor in `commands.go`. No IO, timers or HTTP inside `Update` or `View`.
-- Colors are adaptive ANSI roles with a light and dark variant; honor `NO_COLOR`, `TERM=dumb` and non-TTY output. Never paint the app background.
+- Colors are ANSI slots owned by the terminal/system scheme; honor `NO_COLOR`, `TERM=dumb` and non-TTY output. Never paint the app background; exported screenshots resolve the same palette through `internal/termtheme`.
 - Errors: wrap with `%w`, return instead of panicking, and surface user-facing failures as a single line on stderr. Database driver errors are printed verbatim. stdout belongs to plot output and the UI; when `DEBUG` is set, `log/slog` writes only to `os.UserCacheDir()/pl/debug.log`, never to stdout or stderr.
 - i18n: no hard-coded user-facing strings in Go; ids and description go in `internal/i18n/active.en.toml`, translations in `active.<lng>.toml`, both embedded.
 - Tests sit next to the code in the same package (`<pkg>`), or `<pkg>_test` for the public API. Table-driven subtests with `stretchr/testify` `require`/`assert`. Render goldens use `internal/testutil`, TUI goldens use `teatest` or `-update-tui`, fixtures in `testdata/`.

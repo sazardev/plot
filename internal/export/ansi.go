@@ -7,6 +7,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
+
+	"github.com/sazardev/plot/internal/termtheme"
 )
 
 const (
@@ -28,27 +30,6 @@ const (
 	ansiBrightWhite
 )
 
-var defaultForeground = color.RGBA{R: 233, G: 237, B: 223, A: 255}
-
-var ansiPalette = [16]color.RGBA{
-	{R: 32, G: 36, B: 48, A: 255},
-	{R: 255, G: 107, B: 107, A: 255},
-	{R: 110, G: 231, B: 168, A: 255},
-	{R: 230, G: 217, B: 106, A: 255},
-	{R: 110, G: 168, B: 255, A: 255},
-	{R: 211, G: 139, B: 255, A: 255},
-	{R: 90, G: 215, B: 230, A: 255},
-	{R: 242, G: 244, B: 233, A: 255},
-	{R: 107, G: 114, B: 128, A: 255},
-	{R: 255, G: 143, B: 143, A: 255},
-	{R: 143, G: 245, B: 192, A: 255},
-	{R: 247, G: 235, B: 138, A: 255},
-	{R: 143, G: 192, B: 255, A: 255},
-	{R: 229, G: 170, B: 255, A: 255},
-	{R: 126, G: 234, B: 245, A: 255},
-	{R: 255, G: 255, B: 255, A: 255},
-}
-
 type styledRune struct {
 	r     rune
 	fg    color.RGBA
@@ -62,8 +43,8 @@ type ansiState struct {
 // parseLine converts one rendered line into styled terminal cells. It keeps
 // spaces so column positions survive, and understands the SGR subset emitted
 // by pl (16-color, 256-color and truecolor foregrounds).
-func parseLine(line string) []styledRune {
-	state := ansiState{fg: defaultForeground}
+func parseLine(line string, palette termtheme.Palette) []styledRune {
+	state := ansiState{fg: palette.Foreground}
 	cells := make([]styledRune, 0, len(line))
 	for index := 0; index < len(line); {
 		if line[index] == 0x1b && index+1 < len(line) && line[index+1] == '[' {
@@ -75,7 +56,7 @@ func parseLine(line string) []styledRune {
 				break
 			}
 			if line[end] == 'm' {
-				applySGR(&state, line[index+2:end])
+				applySGR(&state, line[index+2:end], palette)
 			}
 			index = end + 1
 			continue
@@ -98,7 +79,7 @@ func parseLine(line string) []styledRune {
 	return cells
 }
 
-func applySGR(state *ansiState, params string) {
+func applySGR(state *ansiState, params string, palette termtheme.Palette) {
 	if params == "" {
 		params = "0"
 	}
@@ -110,13 +91,13 @@ func applySGR(state *ansiState, params string) {
 		}
 		switch {
 		case value == 0:
-			state.fg = defaultForeground
+			state.fg = palette.Foreground
 		case value == 39:
-			state.fg = defaultForeground
+			state.fg = palette.Foreground
 		case value >= 30 && value <= 37:
-			state.fg = ansiPalette[ansiBlack+value-30]
+			state.fg = palette.ANSI[ansiBlack+value-30]
 		case value >= 90 && value <= 97:
-			state.fg = ansiPalette[ansiBrightBlack+value-90]
+			state.fg = palette.ANSI[ansiBrightBlack+value-90]
 		case value == 38 && index+1 < len(values):
 			kind, err := strconv.Atoi(values[index+1])
 			if err != nil {
@@ -126,7 +107,7 @@ func applySGR(state *ansiState, params string) {
 			case 5:
 				if index+2 < len(values) {
 					if n, err := strconv.Atoi(values[index+2]); err == nil {
-						state.fg = ansi256(n)
+						state.fg = ansi256(n, palette)
 						index += 2
 					}
 				}
@@ -145,12 +126,12 @@ func applySGR(state *ansiState, params string) {
 	}
 }
 
-func ansi256(n int) color.RGBA {
+func ansi256(n int, palette termtheme.Palette) color.RGBA {
 	if n < 0 {
-		return defaultForeground
+		return palette.Foreground
 	}
 	if n < 16 {
-		return ansiPalette[n]
+		return palette.ANSI[n]
 	}
 	if n >= 232 {
 		level := uint8(8 + (n-232)*10)

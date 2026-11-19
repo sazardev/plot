@@ -59,11 +59,11 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 - Delimiter and header detection, multiple files, column selection, renames, sorting and filtering.
 - Read-only SQLite input with query timeouts and verbatim driver errors.
 - A TUI with chart cycling, help, resize handling, reduced motion and terminal restore.
-- ANSI color, `NO_COLOR`, `TERM=dumb`, ASCII glyphs and non-TTY output.
+- Terminal ANSI colors, `NO_COLOR`, `TERM=dumb`, ASCII glyphs and non-TTY output.
 - Localized messages and locale-aware number formatting.
 - A disposable SQLite cache with content-addressed keys, TTL, LRU eviction and user-only permissions.
 - Strict TOML configuration with flags > environment > config > default precedence.
-- Native PNG/JPG/PDF export from the same terminal frame: `--export chart.png` or `e` in the TUI.
+- Native PNG/JPG/PDF export from the same terminal frame, inheriting the terminal palette and system font: `--export chart.png` or `e` in the TUI. Override with `PL_EXPORT_FONT` and `PL_EXPORT_FONT_SIZE`.
 - A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with saved history and a local data agent.
 
 ## Try the example workspace

@@ -1,7 +1,6 @@
 package ui_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/muesli/termenv"
@@ -28,7 +27,7 @@ func TestColorThemeHasEightSeries(t *testing.T) {
 	})
 	assert.Len(t, theme.Series, 8)
 	rendered := theme.Series[0]("x")
-	assert.True(t, strings.Contains(rendered, "\x1b["))
+	assert.Contains(t, rendered, "\x1b[33m", "first series should be terminal ANSI yellow")
 	primary := theme.Primary("title")
-	assert.True(t, strings.Contains(primary, "\x1b["))
+	assert.Contains(t, primary, "\x1b[35m", "chrome should be terminal ANSI magenta")
 }

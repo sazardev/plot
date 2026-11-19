@@ -252,5 +252,5 @@ func TestTUIHelpShowsExportDestinationAtMinimumWidth(t *testing.T) {
 	model.help.ShowAll = true
 	view := model.View()
 	require.Contains(t, view, "e opens export")
-	require.Contains(t, view, "Files are written to")
+	require.Contains(t, view, "Files use the terminal palette")
 }

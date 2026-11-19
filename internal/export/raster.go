@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/mattn/go-runewidth"
@@ -13,6 +14,8 @@ import (
 	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+
+	"github.com/sazardev/plot/internal/termtheme"
 )
 
 const (
@@ -20,23 +23,32 @@ const (
 	footerHeight  = 28
 )
 
-var (
-	backgroundColor = color.RGBA{R: 23, G: 24, B: 36, A: 255}
-	mutedForeground = color.RGBA{R: 141, G: 146, B: 132, A: 255}
-)
-
-// RenderFrame rasterizes the same terminal frame that pl prints. The result is
-// a self-contained image with the chart's colors, braille and block glyphs, so
-// CLI and TUI exports look like the view the user just saw.
+// RenderFrame rasterizes a chart frame with the embedded fallback palette and
+// font. Use RenderFrameWithOptions to inherit a terminal palette and font.
 func RenderFrame(frame string) (*image.RGBA, error) {
+	return RenderFrameWithOptions(frame, DefaultOptions())
+}
+
+// RenderFrameWithOptions rasterizes the same terminal frame that pl prints.
+// The result is a self-contained image with the chart's colors, braille and
+// block glyphs, so CLI and TUI exports look like the view the user just saw.
+func RenderFrameWithOptions(frame string, options Options) (*image.RGBA, error) {
 	if strings.TrimSpace(frame) == "" {
 		return nil, fmt.Errorf("empty chart frame")
+	}
+	palette := options.Palette
+	if palette.Foreground.A == 0 && palette.Background.A == 0 {
+		palette = termtheme.DefaultPalette()
+	}
+	fontSize := options.FontSize
+	if fontSize <= 0 {
+		fontSize = 16
 	}
 	lines := strings.Split(strings.TrimRight(frame, "\n"), "\n")
 	parsed := make([][]styledRune, len(lines))
 	maxColumns := 0
 	for row, line := range lines {
-		parsed[row] = parseLine(line)
+		parsed[row] = parseLine(line, palette)
 		columns := 0
 		for _, cell := range parsed[row] {
 			columns += cell.width
@@ -49,11 +61,11 @@ func RenderFrame(frame string) (*image.RGBA, error) {
 		return nil, fmt.Errorf("chart frame has no visible cells")
 	}
 
-	face, err := newFace(16)
+	face, err := newFace(fontSize, options.FontPath)
 	if err != nil {
 		return nil, err
 	}
-	smallFace, err := newFace(10)
+	smallFace, err := newFace(math.Max(8, fontSize*0.62), options.FontPath)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +81,12 @@ func RenderFrame(frame string) (*image.RGBA, error) {
 		width = 120
 	}
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	draw.Draw(img, img.Bounds(), image.NewUniform(backgroundColor), image.Point{}, draw.Src)
+	draw.Draw(img, img.Bounds(), image.NewUniform(palette.Background), image.Point{}, draw.Src)
 
 	footer := "pl · terminal charts"
 	footerDot := fixed.P(exportPadding, height-exportPadding)
-	drawer := font.Drawer{Dst: img, Src: image.NewUniform(mutedForeground), Face: smallFace, Dot: footerDot}
+	muted := palette.ANSI[ansiBrightBlack]
+	drawer := font.Drawer{Dst: img, Src: image.NewUniform(muted), Face: smallFace, Dot: footerDot}
 	drawer.DrawString(footer)
 
 	for row, cells := range parsed {
@@ -88,10 +101,10 @@ func RenderFrame(frame string) (*image.RGBA, error) {
 	return img, nil
 }
 
-func newFace(size float64) (font.Face, error) {
-	parsed, err := opentype.Parse(gomono.TTF)
+func newFace(size float64, fontPath string) (font.Face, error) {
+	parsed, err := parseFont(fontPath)
 	if err != nil {
-		return nil, fmt.Errorf("parse exported font: %w", err)
+		return nil, err
 	}
 	face, err := opentype.NewFace(parsed, &opentype.FaceOptions{
 		Size:    size,
@@ -102,6 +115,21 @@ func newFace(size float64) (font.Face, error) {
 		return nil, fmt.Errorf("create exported font: %w", err)
 	}
 	return face, nil
+}
+
+func parseFont(path string) (*opentype.Font, error) {
+	if path != "" {
+		if data, err := os.ReadFile(path); err == nil {
+			if parsed, parseErr := opentype.Parse(data); parseErr == nil {
+				return parsed, nil
+			}
+		}
+	}
+	parsed, err := opentype.Parse(gomono.TTF)
+	if err != nil {
+		return nil, fmt.Errorf("parse exported font: %w", err)
+	}
+	return parsed, nil
 }
 
 func drawCell(dst *image.RGBA, face font.Face, cell styledRune, x, y, cellWidth, cellHeight int) {
@@ -375,7 +403,7 @@ func absInt(value int) int {
 
 // CellWidth is exposed for tests and diagnostics.
 func CellWidth(frame string) int {
-	face, err := newFace(16)
+	face, err := newFace(16, "")
 	if err != nil {
 		return 0
 	}

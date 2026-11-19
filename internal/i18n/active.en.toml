@@ -415,7 +415,7 @@ other = "p  PNG image\nj  JPG image\nd  PDF document\nesc  cancel"
 
 ["tui.export.note"]
 description = "TUI export panel note about preserving the rendered chart."
-other = "The exported file keeps the current colors, braille and block glyphs. The status bar shows the saved path."
+other = "The exported file inherits the terminal palette and system font, and keeps the braille and block glyphs. The status bar shows the saved path."
 
 ["tui.export.done"]
 description = "TUI status after a successful chart export."
@@ -435,7 +435,7 @@ other = "Tab cycles only chart types compatible with the current data."
 
 ["tui.help.export"]
 description = "Full TUI help: export key and destination."
-other = "e opens export: p PNG, j JPG, d PDF. Files are written to {{.Dir}} after a chart loads."
+other = "e opens export: p PNG, j JPG, d PDF. Files use the terminal palette and system font, and go to {{.Dir}} after a chart loads."
 
 ["tui.only_compatible"]
 description = "TUI notice when only one chart type fits the data."

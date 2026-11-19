@@ -634,7 +634,8 @@ pl --tui --no-motion sales.csv   <span class="comment"># static first frame</spa
               <code>tab</code> cycles only chart types compatible with the data. Multi-series files usually fit
               line only; a single-series file can use line, bar, pie and donut. Press <code>e</code> to see the
               current chart, destination directory and filename pattern; <code>p</code>, <code>j</code> and
-              <code>d</code> export PNG, JPG and PDF, and the status bar shows the saved path.
+              <code>d</code> export PNG, JPG and PDF, and the status bar shows the saved path. TUI colors use the
+              terminal ANSI palette; exported screenshots also inherit the terminal palette and system monospace font.
             </p>
             <div class="key-grid">
               <div class="key-item"><kbd>q</kbd><span>Quit</span></div>
@@ -736,6 +737,7 @@ max_size = "64MiB"</code></pre>
                   <tr><td><code>PL_LANG</code></td><td>Locale override (BCP 47)</td></tr>
                   <tr><td><code>NO_COLOR</code> / <code>TERM=dumb</code></td><td>Plain output and ASCII glyphs</td></tr>
                   <tr><td><code>DEBUG=1</code></td><td>Write diagnostics to <code>os.UserCacheDir()/pl/debug.log</code></td></tr>
+                  <tr><td><code>PL_EXPORT_FONT</code> / <code>PL_EXPORT_FONT_SIZE</code></td><td>Font file/family and size for exported screenshots</td></tr>
                 </tbody>
               </table>
             </div>

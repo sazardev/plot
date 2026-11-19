@@ -84,6 +84,10 @@ if you want to change it.
 compatible; use `channels.csv` (the `tui` scenario) to see bar, pie and donut as well. The TUI status bar tells
 you when only one chart fits.
 
+TUI colors use the terminal ANSI palette, so they follow the terminal/system scheme. Exported screenshots inherit
+that palette and the system monospace font; override with `PL_EXPORT_FONT` (file or fontconfig family) and
+`PL_EXPORT_FONT_SIZE` when your terminal uses a custom font.
+
 ## Browser playground
 
 The CLI reads delimited text and read-only SQLite. The website additionally handles Markdown, JSON, SQL dumps,

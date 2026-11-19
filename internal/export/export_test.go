@@ -2,6 +2,7 @@ package export_test
 
 import (
 	"bytes"
+	"image/color"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,4 +106,16 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestRenderFrameWithPalette(t *testing.T) {
+	t.Parallel()
+
+	options := export.DefaultOptions()
+	options.Palette.Background = color.RGBA{R: 10, G: 20, B: 30, A: 255}
+	options.Palette.Foreground = color.RGBA{R: 240, G: 230, B: 220, A: 255}
+	options.Palette.ANSI[3] = color.RGBA{R: 0, G: 0, B: 255, A: 255}
+	img, err := export.RenderFrameWithOptions(exportFrame(t), options)
+	require.NoError(t, err)
+	assert.Equal(t, options.Palette.Background, img.RGBAAt(0, 0))
 }

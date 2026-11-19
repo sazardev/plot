@@ -29,6 +29,7 @@ func runTUI(
 	colorEnabled bool,
 	glyphMode domain.GlyphMode,
 	theme render.Theme,
+	exportOptions export.Options,
 	cache *storage.Cache,
 ) (err error) {
 	defer func() {
@@ -89,7 +90,7 @@ func runTUI(
 		}
 		filename := fmt.Sprintf("pl-%s-%s.%s", spec.ChartType, time.Now().Format("20060102-150405"), format)
 		path := filepath.Join(exportDir, filename)
-		if err := export.WriteFrame(frame, path); err != nil {
+		if err := export.WriteFrameWithOptions(frame, path, exportOptions); err != nil {
 			return "", err
 		}
 		return path, nil

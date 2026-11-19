@@ -11,7 +11,25 @@ import (
 	"strings"
 
 	"github.com/go-pdf/fpdf"
+
+	"github.com/sazardev/plot/internal/termtheme"
 )
+
+// Options control the rasterized screenshot. Palette and font come from the
+// terminal/system where possible, with embedded fallbacks for non-TTY runs.
+type Options struct {
+	Palette  termtheme.Palette
+	FontPath string
+	FontSize float64
+}
+
+// DefaultOptions are used by tests and non-interactive exports.
+func DefaultOptions() Options {
+	return Options{
+		Palette:  termtheme.DefaultPalette(),
+		FontSize: 16,
+	}
+}
 
 type format string
 
@@ -39,14 +57,20 @@ func FormatForPath(path string) (string, error) {
 	}
 }
 
-// WriteFrame rasterizes a rendered chart frame and writes it to path. The
-// format comes from the file extension.
+// WriteFrame rasterizes a rendered chart frame with the default palette/font
+// and writes it to path. The format comes from the file extension.
 func WriteFrame(frame, path string) error {
+	return WriteFrameWithOptions(frame, path, DefaultOptions())
+}
+
+// WriteFrameWithOptions rasterizes a rendered chart frame and writes it to
+// path. The format comes from the file extension.
+func WriteFrameWithOptions(frame, path string, options Options) error {
 	selected, err := FormatForPath(path)
 	if err != nil {
 		return err
 	}
-	img, err := RenderFrame(frame)
+	img, err := RenderFrameWithOptions(frame, options)
 	if err != nil {
 		return fmt.Errorf("render export: %w", err)
 	}

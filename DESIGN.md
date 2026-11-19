@@ -1,12 +1,12 @@
 # DESIGN.md: Modern TUI (Charm-style)
 
-The modern terminal look popularized by Charm (Glow, Gum, Soft Serve): rounded borders, soft adaptive colors that suit light
+The modern terminal look popularized by Charm (Glow, Gum, Soft Serve): rounded borders, terminal-owned colors that suit light
 and dark terminals, generous padding, gentle spinners and markdown rendered with care. Friendly, polished, still fast.
 
 ## Principles
 
 - **Friendly, not loud**: soft colors, rounded corners, breathing room.
-- **Adaptive**: every color has a light and a dark variant chosen from the terminal background.
+- **Terminal-owned**: colors use ANSI slots, so the terminal and system scheme supply light/dark variants.
 - **Guided**: inline help, clear prompts and forms that tell you what to do next.
 - **Polish in motion**: spinners and small transitions show life without slowing anything.
 - **Readable docs**: markdown is rendered (headings, code, lists), not dumped.
@@ -14,23 +14,24 @@ and dark terminals, generous padding, gentle spinners and markdown rendered with
 
 ## Color
 
-| Token | Light terminal | Dark terminal | ANSI 16 fallback | Use |
-| --- | --- | --- | --- | --- |
-| `fg` | `#1A1A1A` | `#DDDDDD` | default | Text |
-| `muted` | `#8A8A8A` | `#6C6C6C` | 8 | Hints, help |
-| `primary` | `#7D56F4` | `#9B7CFF` (approx.) | 5 | Titles, focus, selection |
-| `secondary` | `#EE6FF8` | `#F78CFF` (approx.) | 13 | Highlights, badges |
-| `success` | `#02BA84` | `#04D99A` (approx.) | 2 | Done |
-| `warning` | `#C99700` (approx.) | `#F2C94C` (approx.) | 3 | Attention |
-| `danger` | `#E0245E` (approx.) | `#FF5F87` | 1 | Errors |
-| `surface` | `#F2F0FA` (approx.) | `#2A2438` (approx.) | none | Badges and selected items background |
+| Token | ANSI slot | Use |
+| --- | --- | --- |
+| `fg` | terminal default | Text |
+| `muted` | 8 (bright black) | Hints, help, secondary labels |
+| `primary` | 5 (magenta) | Titles, focus, selection |
+| `secondary` | 13 (bright magenta) | Highlights, badges |
+| `success` | 2 (green) | Done |
+| `warning` | 3 (yellow) | Attention |
+| `danger` | 1 (red) | Errors |
+| `accent` | 4 (blue) | Charts, links, emphasis |
+| `info` | 6 (cyan) | Secondary series, metadata |
 
-- Adaptive colors via `lipgloss.AdaptiveColor{Light, Dark}`; background detected once at start.
+- Terminal ANSI slots via `lipgloss.Color("1"…)`; the terminal/system scheme owns the actual RGB values and background, detected once at start.
 - Colors are **ANSI roles, not hex**: default foreground/background for text, `8`/bright black for muted, `1` red for danger, `2` green for success, `3` yellow for warning, `4` blue for accent, `5` magenta for highlights, `6` cyan for links/info.
 - Never set a background on the whole screen; selections use reverse video (`SGR 7`) or the accent as background with the default background as text.
-- Truecolor (`COLORTERM=truecolor`) only for gradients and charts, always with an ANSI 16 fallback; 256-color in between.
+- ANSI 16 slots for the TUI and charts; truecolor is reserved for the web demo palette. The terminal decides the actual color depth.
 - `NO_COLOR` set or `TERM=dumb` → no colors at all, hierarchy by bold, dim, underline and spacing alone; not a TTY → plain text.
-- Success/danger pairs never rely on red vs green alone: add icons (`✓`, `✕`), labels or patterns; charts use a color-blind safe set (e.g. Okabe-Ito: `#E69F00`, `#56B4E9`, `#009E73`, `#F0E442`, `#0072B2`, `#D55E00`, `#CC79A7`).
+- Success/danger pairs never rely on red vs green alone: add icons (`✓`, `✕`), labels or patterns. Charts use terminal ANSI slots plus marker shapes and legend order; the web demo keeps its own brand palette.
 
 ## Typography
 
@@ -101,7 +102,7 @@ and dark terminals, generous padding, gentle spinners and markdown rendered with
 
 ## Accessibility
 
-- Adaptive colors keep contrast on light and dark terminals; check `muted` stays ≥ 4.5:1 for anything important (approx.).
+- ANSI roles follow the terminal light/dark scheme; check `muted` stays ≥ 4.5:1 for anything important (approx.).
 - `NO_COLOR`/`TERM=dumb`: Lip Gloss drops colors; borders and markers still show focus.
 - Non-TTY: print plain output (Gum-style: results to stdout, UI to stderr).
 - Keyboard: arrows and vi keys, `/` filter, `?` help, `esc` back, `q`/`ctrl+c` quit.
@@ -112,7 +113,7 @@ and dark terminals, generous padding, gentle spinners and markdown rendered with
 ## Rules for agents
 
 - Use Bubble Tea + Bubbles + Lip Gloss + Huh + Glamour; Ratatui equivalent: rounded `BorderType::Rounded`, `tui-input`, `tui-markdown` (approx.).
-- Styles only in `styles.go` with `AdaptiveColor`; never a raw color in a view.
+- Styles only in `styles.go` with ANSI slots or explicit web-brand tokens; never a raw color in a view.
 - Every screen has a short help line; every action is in the full help.
 - Respect the terminal background: no full-screen background painting.
 - Test with light and dark terminal themes, `NO_COLOR=1` and at 80×24.
@@ -130,7 +131,7 @@ and dark terminals, generous padding, gentle spinners and markdown rendered with
 ## Toolkit
 
 | Design | Lip Gloss / Bubble Tea |
-| Color token | one `lipgloss.AdaptiveColor{Light, Dark}` (or an ANSI index string `"4"` when the theme inherits the terminal) per token, in `styles.go` |
+| Color token | one ANSI index string (`"4"`, `"8"`, …) per token in `styles.go`, or a web-brand token in `docs/assets/site.css` |
 | Text style | one named `lipgloss.Style` per role (`Title`, `Muted`, `Key`, `Error`…), built once, never inline in a view |
 | Frame | `.Border(lipgloss.RoundedBorder())` (or `NormalBorder`, `ThickBorder`, `DoubleBorder`, `BlockBorder`, `HiddenBorder`) + `.BorderForeground(token)` |
 | Spacing | `.Padding(v, h)` inside frames, `.Margin(v, h)` between blocks; one cell is the unit |

@@ -48,7 +48,7 @@ immediately, and can escalate to an interactive view when the user wants to expl
 
 - Not a dashboard, multi-panel report or multi-chart tool: one dataset and one chart per invocation.
 - Not a statistics package: no regression, fitting, aggregation engines, pivot tables, trendlines or forecasting.
-- Not a GUI, browser, image, SVG, HTML or PDF exporter; output is terminal characters and ANSI attributes.
+- Not a GUI, browser dashboard or SVG/HTML report exporter. Terminal output is characters and ANSI attributes; the only file exports are terminal-frame PNG/JPG/PDF snapshots.
 - Not a general database client or SQL IDE; v1 reads SQLite read-only. PostgreSQL/MySQL users pipe `psql --csv` or
   `mysql --batch` output instead.
 - Not a replacement for `youplot`'s exact CLI surface; it is inspiration only.
@@ -370,6 +370,10 @@ browser or external converter.
   directory, and `esc` cancels. The status bar reports the resulting path.
 - Exports preserve ANSI foreground colors, braille/block/box glyphs, null gaps, titles and legends. A plain
   (non-TTY) CLI render exported to a file still keeps the automatic palette unless `--color=never` was requested.
+- On a TTY, exported screenshots inherit the terminal's background, foreground and 16-color ANSI palette through
+  OSC 4/10/11 queries, plus the system monospace font (or `PL_EXPORT_FONT`); terminals that do not answer fall back
+  to a standard palette and embedded font. TUI chrome and series use ANSI slots, so the terminal/system scheme owns
+  the colors; the TUI never paints its own background.
 - Export is local and deterministic; it never requires network access, a plotting library or a browser runtime.
 
 ## 7. Non-functional requirements
@@ -405,8 +409,9 @@ Cache hit and miss do not change output. TUI frames at rest match their golden f
 
 **NFR-6 — Accessibility of output.** Charts use Unicode box drawing, braille (U+2800–U+28FF) and block elements,
 with an ASCII fallback selected by `--ascii`, a non-UTF-8 locale or `TERM=dumb`. Series are distinguishable by
-marker shape and legend order as well as color; the palette is the Okabe-Ito set from DESIGN.md with an ANSI 16
-fallback. Text never relies on red/green alone. `NO_COLOR`, `TERM=dumb` and non-TTY output are honored; no
+marker shape and legend order as well as color. Series and chrome use the terminal's 16 ANSI color slots, so the
+terminal/system color scheme owns the actual palette; no background is painted. The browser demo may use its own
+brand palette. Text never relies on red/green alone. `NO_COLOR`, `TERM=dumb` and non-TTY output are honored; no
 background is painted; labels truncate with `…` (or `...` in ASCII) rather than wrapping. Check new screens with a
 color-blindness simulator and in monochrome before calling them done.
 
@@ -577,6 +582,8 @@ max_size = "64MiB"
 | `TERM` | `dumb` selects plain ASCII, no SGR, no animation. |
 | `CI` | Non-empty disables TUI animation. |
 | `DEBUG` | Non-empty enables `os.UserCacheDir()/pl/debug.log` (0600); no debug output on stdout/stderr. |
+| `PL_EXPORT_FONT` | Font file or fontconfig family for exported screenshots; default is the system monospace font, then the embedded Go Mono. |
+| `PL_EXPORT_FONT_SIZE` | Export font size in points (6–96); default `16`. |
 | `LANG`, `LC_ALL`, `LC_CTYPE`, `LC_MESSAGES` | Locale and UTF-8 detection. |
 | `XDG_CACHE_HOME` | Base for the default cache directory on Unix. |
 
@@ -673,9 +680,9 @@ cycle with `internal/ui/styles.go`.
 - Axes/numbers: SI suffixes (`k`, `M`, `G`, `m`, `µ`, `n`), 3 significant digits, locale decimal separator, no
   `-0`. Time axes use the shortest unambiguous ISO-style label for the span. In ASCII mode `µ` is `u`, `×` is `x`,
   `—` is `-`, `…` is `...` and U+FFFD is `?`.
-- Colors: UI chrome uses adaptive ANSI roles from `internal/ui/styles.go`; series use the Okabe-Ito palette in
-  truecolor with an ANSI 16 fallback. No background is painted. Monochrome output uses marker shape and legend
-  order.
+- Colors: UI chrome and series use ANSI slots from `internal/ui/styles.go`; the terminal/system scheme resolves
+  them. No background is painted. Monochrome output uses marker shape and legend order. Exports resolve the same
+  ANSI slots against the terminal palette, falling back to the standard palette and an embedded monospace font.
 - Warnings go to stderr, one line per category, deduplicated; stdout contains only the chart.
 - If the renderer cannot fit the minimum, print one line and exit `1` (FR-10).
 
@@ -705,12 +712,12 @@ cycle with `internal/ui/styles.go`.
 | Pie/donut | braille/blocks + box-drawing frame | `#`, `*`, `+`, `.` | Legend carries labels and percentages. |
 | Frame (TUI) | rounded `╭─╮│╰╯` | `+ - \|` | CLI has no outer frame. |
 
-- Series palette order: Okabe-Ito orange, sky blue, bluish green, yellow, blue, vermillion, reddish purple, grey;
-  ANSI 16 fallback follows DESIGN.md. Markers: `● ▲ ■ ◆ ▼ ○ ◇ ✚` with ASCII `o ^ # * v O + x`.
+- Series palette order: terminal ANSI yellow, cyan, green, magenta, blue, red, bright magenta, bright black;
+  ANSI slots follow DESIGN.md. Markers: `● ▲ ■ ◆ ▼ ○ ◇ ✚` with ASCII `o ^ # * v O + x`.
 - Color is never the only signal: legend shows marker + label + (for pie) percentage; monochrome line charts place
   distinct markers at sampled points.
 - No Nerd Font, glyph or color-depth requirement; detect and degrade. `--ascii` forces the fallback.
-- Contrast: adaptive roles; muted text is used only for secondary information; important labels use the default
+- Contrast: terminal ANSI roles; muted text is used only for secondary information; important labels use the default
   foreground. Test light/dark themes and `NO_COLOR=1` per DESIGN.md.
 
 ### 11.4 Size and truncation
@@ -787,7 +794,7 @@ cycle with `internal/ui/styles.go`.
   while the initial load is running, and `1` after a load error panel.
 - `NO_COLOR`, `TERM=dumb`, non-TTY, ASCII locale: plain/monochrome output remains readable; no SGR off a TTY
   unless `--color=always`.
-- `COLORTERM`/truecolor unsupported: ANSI 16 series fallback; no broken escapes.
+- `COLORTERM`/truecolor unsupported: ANSI 16 series slots; no broken escapes.
 - Recovered panic: terminal restored, stack only in the debug file, one-line user message, exit `1`.
 
 **Cache and database**
@@ -852,7 +859,7 @@ The spec follows STACK.md, DESIGN.md and AGENTS.md. These resolutions are reflec
   localizer.
 - Commands build `bin/pl` or `pl` with `CGO_ENABLED=0`; the documented exit codes are §9.3.
 
-DESIGN.md needs no rule changes: this spec uses its adaptive ANSI roles, Okabe-Ito palette, braille/block glyphs,
+DESIGN.md needs no rule changes: this spec uses terminal ANSI roles, braille/block glyphs,
 ASCII fallback, 80×24 target, 40×20 minimum, TUI 100-cell content column, rounded TUI frame, no background
 painting, and reduced-motion rules. The added runtime dependencies are the pure-Go SQLite driver, TOML parser and
 `golang.org/x/text` (already present for i18n).
@@ -884,7 +891,7 @@ painting, and reduced-motion rules. The added runtime dependencies are the pure-
 | Storage | Temp SQLite with migrations; read-only source; missing/non-SQLite/locked driver errors verbatim; timeout message; cache cold/warm/corrupt/locked/unwritable; `0600`/`0700` permissions; hit/miss output identical. |
 | Performance | Benchmarks for 10k×5 cold CLI, warm CLI and TUI first frame; p95 against NFR-1; RSS against NFR-2; numbers recorded in the milestone. |
 | Determinism | Render the same spec 100 times and compare bytes; run with cache on/off and compare; stable-sort tie cases. |
-| Export | PNG/JPG/PDF magic bytes, image dimensions, ANSI/braille/block glyph rendering, TUI export keys and path status. |
+| Export | PNG/JPG/PDF magic bytes, image dimensions, ANSI/braille/block glyph rendering, terminal palette/font inheritance, TUI export keys and path status. |
 | i18n | A test loads every `active.*.toml`, checks every message ID/template used by the code, and verifies fallback to English. |
 | Quality gates | `go build ./...`, `gofmt -l -w .`, `go vet ./...`, `golangci-lint run`, `go test ./...`, `go test -race ./...`, goldens committed, `sqlc generate` leaves no diff, `goreleaser check`. |
 

@@ -99,8 +99,8 @@ func New(opts Options) Model {
 	styles := NewStyles(opts.Color, opts.Theme.ASCII)
 	helpModel := help.New()
 	helpModel.Width = 80
+	plain := lipgloss.NewStyle()
 	if !opts.Color {
-		plain := lipgloss.NewStyle()
 		helpModel.Styles = help.Styles{
 			Ellipsis:       plain,
 			ShortKey:       plain,
@@ -109,6 +109,18 @@ func New(opts Options) Model {
 			FullKey:        plain,
 			FullDesc:       plain,
 			FullSeparator:  plain,
+		}
+	} else {
+		keyStyle := lipgloss.NewStyle().Foreground(primaryColor)
+		descStyle := lipgloss.NewStyle().Foreground(mutedColor)
+		helpModel.Styles = help.Styles{
+			Ellipsis:       descStyle,
+			ShortKey:       keyStyle,
+			ShortDesc:      descStyle,
+			ShortSeparator: descStyle,
+			FullKey:        keyStyle,
+			FullDesc:       descStyle,
+			FullSeparator:  descStyle,
 		}
 	}
 	if opts.Theme.ASCII {
@@ -120,6 +132,9 @@ func New(opts Options) Model {
 	spin.Spinner = spinner.Dot
 	if opts.Theme.ASCII {
 		spin.Spinner = spinner.Line
+	}
+	if opts.Color {
+		spin.Style = lipgloss.NewStyle().Foreground(primaryColor)
 	}
 	return Model{
 		opts:    opts,
