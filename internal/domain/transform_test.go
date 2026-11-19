@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 func build(t *testing.T, ds *domain.Dataset, opts domain.BuildOptions) *domain.RenderSpec {

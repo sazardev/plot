@@ -12,9 +12,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/i18n"
-	"github.com/sazar/plot/internal/render"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/render"
 )
 
 const (

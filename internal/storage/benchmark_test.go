@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/storage"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/storage"
 )
 
 func BenchmarkParseInfer10k(b *testing.B) {

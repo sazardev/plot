@@ -35,7 +35,7 @@ rendering and configuration are plain Go packages outside the UI.
 ## Project layout
 
 ```
-cmd/app/                          entry point: flags, config, source selection, CLI pipeline, TUI wiring, exit codes
+cmd/pl/                          entry point: flags, config, source selection, CLI pipeline, TUI wiring, exit codes
 internal/
   config/                         strict TOML config, path resolution, duration/size parsing
   domain/                         plain Go types and rules: Dataset, inference, transforms, RenderSpec
@@ -103,10 +103,10 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 
 | Task | Command |
 | --- | --- |
-| Run on a file | `go run ./cmd/app data.csv` |
-| Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/app` |
-| Run the TUI | `go run ./cmd/app --tui data.csv` |
-| Build | `CGO_ENABLED=0 go build -o pl ./cmd/app` |
+| Run on a file | `go run ./cmd/pl data.csv` |
+| Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/pl` |
+| Run the TUI | `go run ./cmd/pl --tui data.csv` |
+| Build | `CGO_ENABLED=0 go build -o pl ./cmd/pl` |
 | Test | `go test ./...` |
 | Test race | `go test -race ./...` |
 | Update render goldens | `go test ./internal/render -update` |
@@ -117,7 +117,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 | Generate cache code | `sqlc generate` |
 | New cache migration | `goose -dir db/migrations create <name> sql` |
 | Apply cache migration (authoring) | `goose -dir db/migrations sqlite3 /tmp/pl-cache.db up` |
-| Debug log | `DEBUG=1 go run ./cmd/app data.csv`, then read `$XDG_CACHE_HOME/pl/debug.log` |
+| Debug log | `DEBUG=1 go run ./cmd/pl data.csv`, then read `$XDG_CACHE_HOME/pl/debug.log` |
 | Inspect cache (Linux) | `sqlite3 ~/.cache/pl/cache.db` |
 | Release dry run | `goreleaser release --snapshot --clean` |
 | Coverage | `go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out` |

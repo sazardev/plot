@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/sazar/plot/internal/storage"
+	"github.com/sazardev/plot/internal/storage"
 )
 
 func FuzzReadCSV(f *testing.F) {

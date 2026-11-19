@@ -18,8 +18,8 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/sazar/plot/internal/db"
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/db"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 const (

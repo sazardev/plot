@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/i18n"
 )
 
 const (

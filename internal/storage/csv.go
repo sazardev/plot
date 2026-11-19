@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 // HeaderMode controls first-record handling.

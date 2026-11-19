@@ -12,7 +12,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 // SQLiteOptions selects and runs the read-only database source.

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sazar/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/i18n"
 )
 
 func TestEnglishMessagesLoad(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/sazar/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/i18n"
 )
 
 type cliOptions struct {

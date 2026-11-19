@@ -592,7 +592,7 @@ pl --version
 
 | Package | Responsibility | May import |
 | --- | --- | --- |
-| `cmd/app` | Flag/config parsing (cobra), source selection, composition root, exit-code mapping, CLI/TUI choice. | everything below |
+| `cmd/pl` | Flag/config parsing (cobra), source selection, composition root, exit-code mapping, CLI/TUI choice. | everything below |
 | `internal/domain` | `Dataset`, `Column`, `Series`, `RenderSpec`, inference, filter/sort/selection rules, ports (`DatasetSource`, `CacheStore`). | standard library only |
 | `internal/render` | Pure chart layout, axes, glyphs and ANSI output; no Bubble Tea, no Lip Gloss, no IO. | `domain`, `x/text`, display-width helper |
 | `internal/storage` | stdin/file/SQLite source adapters; cache implementation over `internal/db`. | `domain`, `internal/db`, SQLite driver |

@@ -12,9 +12,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/i18n"
-	"github.com/sazar/plot/internal/render"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/render"
 )
 
 var updateTUI = flag.Bool("update-tui", false, "update TUI golden files")

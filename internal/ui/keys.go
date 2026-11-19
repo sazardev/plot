@@ -3,7 +3,7 @@ package ui
 import (
 	"github.com/charmbracelet/bubbles/key"
 
-	"github.com/sazar/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/i18n"
 )
 
 // KeyMap holds every TUI binding and its help text.

@@ -3,8 +3,8 @@ package render_test
 import (
 	"testing"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/render"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/render"
 )
 
 func BenchmarkChartLine10k(b *testing.B) {

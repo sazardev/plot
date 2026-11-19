@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/sazar/plot/internal/domain"
+import "github.com/sazardev/plot/internal/domain"
 
 type chartView struct {
 	spec     *domain.RenderSpec

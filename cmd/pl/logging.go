@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sazar/plot/internal/storage"
+	"github.com/sazardev/plot/internal/storage"
 )
 
 // setupLogging sends debug output to os.UserCacheDir()/pl/debug.log when DEBUG

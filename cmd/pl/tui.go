@@ -8,11 +8,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/i18n"
-	"github.com/sazar/plot/internal/render"
-	"github.com/sazar/plot/internal/storage"
-	"github.com/sazar/plot/internal/ui"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/i18n"
+	"github.com/sazardev/plot/internal/render"
+	"github.com/sazardev/plot/internal/storage"
+	"github.com/sazardev/plot/internal/ui"
 )
 
 func runTUI(

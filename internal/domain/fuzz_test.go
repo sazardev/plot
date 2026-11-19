@@ -3,7 +3,7 @@ package domain_test
 import (
 	"testing"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 func FuzzFilter(f *testing.F) {

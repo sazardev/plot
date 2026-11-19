@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/sazar/plot/internal/render"
+	"github.com/sazardev/plot/internal/render"
 )
 
 // ThemeOptions are the resolved color/glyph decisions from the CLI.

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sazar/plot/internal/config"
+	"github.com/sazardev/plot/internal/config"
 )
 
 func TestLoadResolvesPathsAndParsesValues(t *testing.T) {

@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/render"
-	"github.com/sazar/plot/internal/testutil"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/render"
+	"github.com/sazardev/plot/internal/testutil"
 )
 
 func lineSpec() *domain.RenderSpec {

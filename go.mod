@@ -1,4 +1,4 @@
-module github.com/sazar/plot
+module github.com/sazardev/plot
 
 go 1.26.0
 

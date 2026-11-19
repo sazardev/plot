@@ -10,7 +10,7 @@
 - [DESIGN.md](DESIGN.md): the design system: tokens, components and UI rules.
 - [SPEC.md](SPEC.md): what is being built: requirements, acceptance criteria and open questions.
 
-Read the code around a change before writing: `cmd/app` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input and owns the disposable cache, `internal/render` draws, `internal/ui` holds the TUI root, keys, styles and messages, and `internal/config` loads strict TOML. A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
+Read the code around a change before writing: `cmd/pl` is the entry point, `internal/domain` owns the rules, `internal/storage` parses input and owns the disposable cache, `internal/render` draws, `internal/ui` holds the TUI root, keys, styles and messages, and `internal/config` loads strict TOML. A `go.mod` exists; no `Makefile` yet, so use the raw commands below.
 
 ## Commands
 
@@ -18,10 +18,10 @@ Read the code around a change before writing: `cmd/app` is the entry point, `int
 | --- | --- |
 | Install dependencies | `go mod download` |
 | Build everything | `CGO_ENABLED=0 go build ./...` |
-| Build the binary | `CGO_ENABLED=0 go build -o pl ./cmd/app` |
-| Run on a file | `go run ./cmd/app data.csv` |
-| Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/app` |
-| Run the TUI | `go run ./cmd/app --tui data.csv` |
+| Build the binary | `CGO_ENABLED=0 go build -o pl ./cmd/pl` |
+| Run on a file | `go run ./cmd/pl data.csv` |
+| Run on a pipe | `printf 'a,b\n1,2\n' \| go run ./cmd/pl` |
+| Run the TUI | `go run ./cmd/pl --tui data.csv` |
 | All tests | `go test ./...` |
 | Single test | `go test ./internal/domain -run TestInferClassifiesColumnsAndValues -v` |
 | Race detector | `go test -race ./...` |
@@ -41,7 +41,7 @@ Read the code around a change before writing: `cmd/app` is the entry point, `int
 ## Layout
 
 ```
-cmd/app/            entry point: flags, source selection, CLI pipeline, exit codes
+cmd/pl/            entry point: flags, source selection, CLI pipeline, exit codes
 internal/domain/    plain Go types and rules (Dataset, Column, RenderSpec, inference); no Bubble Tea/Lip Gloss
 internal/config/    strict TOML config, path resolution, duration/size parsing
 internal/storage/   delimited input (stdin/CSV), read-only SQLite source, disposable SQLite cache
@@ -76,7 +76,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 
 1. Find the governing requirement in [SPEC.md](SPEC.md) (FR-n, NFR-n); if the task contradicts it, stop and ask.
 2. Read the code around the change and the layer it belongs to; check the dependency direction before adding an import.
-3. Reproduce the behaviour with the real command (`go run ./cmd/app ...` or a failing test) before editing.
+3. Reproduce the behaviour with the real command (`go run ./cmd/pl ...` or a failing test) before editing.
 4. Add or adjust a test first: unit test next to the code, golden test for anything rendered.
 5. Make the minimal change in the correct layer; keep `domain` free of UI imports and side effects inside `tea.Cmd`s.
 6. Run `gofmt -l -w .`, `go vet ./...`, `golangci-lint run`, `go test ./...`; regenerate sqlc code if a query or migration changed.

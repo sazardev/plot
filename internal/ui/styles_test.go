@@ -7,7 +7,7 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/sazar/plot/internal/ui"
+	"github.com/sazardev/plot/internal/ui"
 )
 
 func TestNoColorThemeIsPlain(t *testing.T) {

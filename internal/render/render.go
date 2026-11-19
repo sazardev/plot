@@ -7,7 +7,7 @@ import (
 
 	"github.com/mattn/go-runewidth"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 const (

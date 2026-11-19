@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/sazar/plot/internal/domain"
-	"github.com/sazar/plot/internal/storage"
+	"github.com/sazardev/plot/internal/domain"
+	"github.com/sazardev/plot/internal/storage"
 )
 
 func resolveLocale(env map[string]string) string {

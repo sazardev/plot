@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sazar/plot/internal/domain"
+	"github.com/sazardev/plot/internal/domain"
 )
 
 func renderPie(spec *domain.RenderSpec, theme Theme) (string, error) {
