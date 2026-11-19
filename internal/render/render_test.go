@@ -67,6 +67,7 @@ func TestChartLineRendersTitleAxesLabelsAndMarker(t *testing.T) {
 	assert.Contains(t, out, "└")
 	assert.Contains(t, out, "●")
 	assert.Contains(t, out, "signups")
+	assert.True(t, containsBraille(out))
 	assert.NotContains(t, out, "\x1b[")
 }
 
@@ -322,4 +323,30 @@ func TestChartPieGoldens(t *testing.T) {
 			testutil.AssertGolden(t, filepath.Join("testdata", tt.file), []byte(out+"\n"))
 		})
 	}
+}
+
+func containsBraille(text string) bool {
+	for _, r := range text {
+		if r >= 0x2800 && r <= 0x28FF {
+			return true
+		}
+	}
+	return false
+}
+
+func TestChartMultiSeriesBraille(t *testing.T) {
+	t.Parallel()
+
+	spec := lineSpec()
+	spec.Series = append(spec.Series, domain.Series{
+		Column: 2,
+		Label:  "orders",
+		Points: []domain.Point{{X: 0, Y: 1}, {X: 1, Y: 2}, {X: 2, Y: 3}},
+		Marker: 1,
+	})
+	out, err := render.Chart(spec, render.Theme{})
+	require.NoError(t, err)
+	assert.Contains(t, out, "signups")
+	assert.Contains(t, out, "orders")
+	assert.True(t, containsBraille(out))
 }

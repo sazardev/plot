@@ -353,6 +353,13 @@ func (r *renderer) drawAxes() {
 }
 
 func (r *renderer) renderLine() error {
+	if r.theme.ASCII {
+		return r.renderLineCells()
+	}
+	return r.renderLineBraille()
+}
+
+func (r *renderer) renderLineCells() error {
 	for _, series := range r.spec.Series {
 		style := r.theme.seriesStyle(series.ColorSlot)
 		lastX, lastY := 0, 0
@@ -370,7 +377,54 @@ func (r *renderer) renderLine() error {
 			hasLast = true
 		}
 	}
+	r.drawLineMarkers()
+	return nil
+}
 
+func (r *renderer) renderLineBraille() error {
+	bits := make([][]uint8, r.plotH)
+	owner := make([][]int, r.plotH)
+	for y := range bits {
+		bits[y] = make([]uint8, r.plotW)
+		owner[y] = make([]int, r.plotW)
+		for x := range owner[y] {
+			owner[y][x] = -1
+		}
+	}
+
+	for seriesIndex, series := range r.spec.Series {
+		lastX, lastY := 0, 0
+		hasLast := false
+		for _, point := range series.Points {
+			if point.Null {
+				hasLast = false
+				continue
+			}
+			x, y := r.xToSub(point.X), r.yToSub(point.Y)
+			if hasLast {
+				r.brailleSegment(lastX, lastY, x, y, seriesIndex, bits, owner)
+			}
+			r.setBraille(x, y, seriesIndex, bits, owner)
+			lastX, lastY = x, y
+			hasLast = true
+		}
+	}
+
+	for y := range bits {
+		for x, value := range bits[y] {
+			if value == 0 {
+				continue
+			}
+			style := r.theme.seriesStyle(owner[y][x])
+			r.canvas.set(r.plotX+x, r.plotY+y, string(rune(0x2800+int(value))), style)
+		}
+	}
+
+	r.drawLineMarkers()
+	return nil
+}
+
+func (r *renderer) drawLineMarkers() {
 	for _, series := range r.spec.Series {
 		style := r.theme.seriesStyle(series.ColorSlot)
 		step := 1
@@ -387,7 +441,89 @@ func (r *renderer) renderLine() error {
 			r.canvas.set(r.xToCol(point.X), r.yToRow(point.Y), r.theme.marker(series.Marker), style)
 		}
 	}
-	return nil
+}
+
+func (r *renderer) brailleSegment(x0, y0, x1, y1, series int, bits [][]uint8, owner [][]int) {
+	dx := abs(x1 - x0)
+	sx := 1
+	if x0 > x1 {
+		sx = -1
+	}
+	dy := -abs(y1 - y0)
+	sy := 1
+	if y0 > y1 {
+		sy = -1
+	}
+	err := dx + dy
+	for {
+		r.setBraille(x0, y0, series, bits, owner)
+		if x0 == x1 && y0 == y1 {
+			break
+		}
+		e2 := 2 * err
+		if e2 >= dy {
+			err += dy
+			x0 += sx
+		}
+		if e2 <= dx {
+			err += dx
+			y0 += sy
+		}
+	}
+}
+
+func (r *renderer) setBraille(x, y, series int, bits [][]uint8, owner [][]int) {
+	if r.plotW <= 0 || r.plotH <= 0 {
+		return
+	}
+	if x < 0 || y < 0 || x >= r.plotW*2 || y >= r.plotH*4 {
+		return
+	}
+	column := x / 2
+	row := y / 4
+	bits[row][column] |= brailleBit(x%2, y%4)
+	if owner[row][column] < 0 {
+		owner[row][column] = series
+	}
+}
+
+func (r *renderer) xToSub(x float64) int {
+	if r.plotW <= 1 || r.xMax == r.xMin {
+		return 0
+	}
+	value := int(math.Round((x - r.xMin) / (r.xMax - r.xMin) * float64(r.plotW*2-1)))
+	return clamp(value, 0, r.plotW*2-1)
+}
+
+func (r *renderer) yToSub(y float64) int {
+	if r.plotH <= 1 || r.yMax == r.yMin {
+		return 0
+	}
+	value := int(math.Round((r.yMax - y) / (r.yMax - r.yMin) * float64(r.plotH*4-1)))
+	return clamp(value, 0, r.plotH*4-1)
+}
+
+func brailleBit(x, y int) uint8 {
+	switch {
+	case x == 0 && y == 0:
+		return 0x01
+	case x == 0 && y == 1:
+		return 0x02
+	case x == 0 && y == 2:
+		return 0x04
+	case x == 0 && y == 3:
+		return 0x40
+	case x == 1 && y == 0:
+		return 0x08
+	case x == 1 && y == 1:
+		return 0x10
+	case x == 1 && y == 2:
+		return 0x20
+	case x == 1 && y == 3:
+		return 0x80
+	default:
+		return 0
+	}
 }
 
 func (r *renderer) renderBar() error {
