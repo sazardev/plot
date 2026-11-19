@@ -84,6 +84,7 @@ type columnStats struct {
 	numeric int
 	time    int
 	boolean int
+	blob    int
 	allInt  bool
 }
 
@@ -110,6 +111,9 @@ func Infer(ds *Dataset) error {
 				ID:   "cli.warn.empty_column",
 				Data: map[string]string{"Name": col.Name},
 			})
+		case stats.blob > 0:
+			col.Kind = ColumnLabel
+			col.ValueType = TypeBlob
 		case stats.numeric > 0 && float64(stats.numeric)/float64(stats.nonNull) >= 0.8:
 			col.Kind = ColumnValue
 			if stats.allInt {
@@ -155,6 +159,10 @@ func analyzeColumn(ds *Dataset, index int) columnStats {
 		case CellBool:
 			stats.nonNull++
 			stats.boolean++
+			continue
+		case CellBlob:
+			stats.nonNull++
+			stats.blob++
 			continue
 		case CellText:
 			raw := cell.Text
@@ -206,6 +214,11 @@ func normalizeColumn(ds *Dataset, index int) {
 			}
 		case CellBool:
 			if col.Kind == ColumnLabel && col.ValueType == TypeBool {
+				distinct[cell.Text] = struct{}{}
+				continue
+			}
+		case CellBlob:
+			if col.Kind == ColumnLabel {
 				distinct[cell.Text] = struct{}{}
 				continue
 			}

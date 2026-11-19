@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Sentinel errors let the CLI map failures to exit codes and localized
@@ -230,3 +231,29 @@ func (e *ColumnNotNumericError) Error() string {
 }
 
 func (e *ColumnNotNumericError) Unwrap() error { return ErrColumnNotNumeric }
+
+// DatabaseError wraps a SQLite/driver failure. The CLI prints Err verbatim,
+// as required by SPEC FR-4 and AGENTS.md.
+type DatabaseError struct {
+	Err error
+}
+
+func (e *DatabaseError) Error() string {
+	if e == nil || e.Err == nil {
+		return "database error"
+	}
+	return e.Err.Error()
+}
+
+func (e *DatabaseError) Unwrap() []error { return []error{ErrSource, e.Err} }
+
+// DatabaseTimeoutError reports a query that exceeded --timeout.
+type DatabaseTimeoutError struct {
+	Timeout time.Duration
+}
+
+func (e *DatabaseTimeoutError) Error() string {
+	return fmt.Sprintf("query timed out after %s", e.Timeout)
+}
+
+func (e *DatabaseTimeoutError) Unwrap() error { return ErrSource }

@@ -95,6 +95,16 @@ func mapDomainError(err error, sourcePath string, fromStdin bool) *appError {
 		return newAppError(exitData, "cli.error.input_too_large", map[string]any{"Limit": "?"}, err)
 
 	case errors.Is(err, domain.ErrSource):
+		var dbErr *domain.DatabaseError
+		if errors.As(err, &dbErr) {
+			return newAppError(exitSource, "", nil, dbErr.Err)
+		}
+		var timeout *domain.DatabaseTimeoutError
+		if errors.As(err, &timeout) {
+			return newAppError(exitSource, "cli.error.db_timeout", map[string]any{
+				"Timeout": timeout.Timeout.String(),
+			}, err)
+		}
 		var sourceErr *domain.SourceError
 		if errors.As(err, &sourceErr) {
 			path := sourceErr.Path

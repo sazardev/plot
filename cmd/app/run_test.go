@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"io"
 	"os"
 	"path/filepath"
@@ -431,7 +432,7 @@ func TestRunHelpListsTransformFlags(t *testing.T) {
 	code := run([]string{"--help"}, stream)
 
 	require.Equal(t, 0, code)
-	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter"} {
+	for _, flag := range []string{"--label", "--columns", "--rename", "--sort", "--filter", "--db", "--query", "--timeout"} {
 		assert.Contains(t, out.String(), flag)
 	}
 }
@@ -582,4 +583,160 @@ func TestRunPieDropsZeroSlicesWithWarning(t *testing.T) {
 	assert.Contains(t, out.String(), "Mar")
 	assert.NotContains(t, out.String(), "Feb")
 	assert.Contains(t, errOut.String(), "zero-valued slice")
+}
+
+func createSQLiteFixture(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "metrics.db")
+	db, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	_, err = db.Exec(`create table metrics (day text, signups integer)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`insert into metrics values ('2024-01-01', 3), ('2024-01-02', 5), ('2024-01-03', 4)`)
+	require.NoError(t, err)
+	return path
+}
+
+func TestRunSQLiteSource(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, out, errOut := testIO("ignored stdin", false, false)
+	stream.Env["LANG"] = "C.UTF-8"
+	code := run([]string{"--db", path, "--query", "select day, signups from metrics order by day"}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "metrics.db")
+	assert.Contains(t, out.String(), "2024-01-01")
+	assert.Contains(t, out.String(), "signups")
+}
+
+func TestRunSQLiteQueryFile(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	queryPath := filepath.Join(t.TempDir(), "query.sql")
+	require.NoError(t, os.WriteFile(queryPath, []byte("select day, signups from metrics"), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{"--db", path, "--query-file", queryPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunSQLiteMissingQueryOrDatabase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "query without db", args: []string{"--query", "select 1"}, want: "no database configured"},
+		{name: "db without query", args: []string{"--db", "metrics.db"}, want: "no query"},
+		{name: "both queries", args: []string{"--db", "metrics.db", "--query", "select 1", "--query-file", "q.sql"}, want: "only one"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stream, _, errOut := testIO("", false, false)
+			code := run(tt.args, stream)
+			assert.Equal(t, exitUsage, code)
+			assert.Contains(t, errOut.String(), tt.want)
+		})
+	}
+}
+
+func TestRunSQLiteSourceConflictWithFile(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, _, errOut := testIO("", false, false)
+	code := run([]string{"--db", path, "--query", "select 1", "data.csv"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "either a database source or file")
+}
+
+func TestRunSQLiteDriverErrorIsVerbatim(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, out, errOut := testIO("", false, false)
+	code := run([]string{"--db", path, "--query", "select * from missing_table"}, stream)
+
+	assert.Equal(t, exitSource, code)
+	assert.Empty(t, out.String())
+	assert.Contains(t, errOut.String(), "no such table: missing_table")
+}
+
+func TestRunSQLiteReadOnly(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, _, errOut := testIO("", false, false)
+	code := run([]string{"--db", path, "--query", "delete from metrics"}, stream)
+
+	assert.Equal(t, exitSource, code)
+	assert.Contains(t, errOut.String(), "readonly")
+}
+
+func TestRunSQLiteEnvironmentSource(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, out, errOut := testIO("", false, false)
+	stream.Env["PL_DB"] = path
+	stream.Env["PL_QUERY"] = "select day, signups from metrics"
+	code := run(nil, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "2024-01-01")
+}
+
+func TestRunSQLiteResultWithNoRows(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	stream, _, errOut := testIO("", false, false)
+	code := run([]string{"--db", path, "--query", "select day, signups from metrics where 0"}, stream)
+
+	assert.Equal(t, exitData, code)
+	assert.Contains(t, errOut.String(), "no data rows")
+}
+
+func TestRunPositionalFileWinsOverDatabaseEnvironment(t *testing.T) {
+	t.Parallel()
+
+	path := createSQLiteFixture(t)
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "sales.csv")
+	require.NoError(t, os.WriteFile(csvPath, []byte("month,revenue\nJan,10\nFeb,20\n"), 0o600))
+
+	stream, out, errOut := testIO("", false, false)
+	stream.Env["PL_DB"] = path
+	stream.Env["PL_QUERY"] = "select day, signups from metrics"
+	code := run([]string{csvPath}, stream)
+
+	require.Equal(t, 0, code)
+	assert.Empty(t, errOut.String())
+	assert.Contains(t, out.String(), "sales.csv")
+	assert.Contains(t, out.String(), "Jan")
+}
+
+func TestRunExplicitDatabaseQueryConflictsWithFile(t *testing.T) {
+	t.Parallel()
+
+	stream, _, errOut := testIO("", false, false)
+	stream.Env["PL_DB"] = createSQLiteFixture(t)
+	code := run([]string{"--query", "select 1", "data.csv"}, stream)
+
+	assert.Equal(t, exitUsage, code)
+	assert.Contains(t, errOut.String(), "either a database source or file")
 }

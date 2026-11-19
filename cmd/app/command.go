@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +27,10 @@ type cliOptions struct {
 	Color      string
 	ASCII      bool
 	Title      string
+	DB         string
+	Query      string
+	QueryFile  string
+	Timeout    time.Duration
 }
 
 func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Command {
@@ -58,6 +63,10 @@ func newCommand(opts *cliOptions, stream appIO, loc *i18n.Localizer) *cobra.Comm
 	cmd.Flags().StringVar(&opts.Color, "color", "auto", loc.T("cli.flag.color", nil))
 	cmd.Flags().BoolVar(&opts.ASCII, "ascii", false, loc.T("cli.flag.ascii", nil))
 	cmd.Flags().StringVar(&opts.Title, "title", "", loc.T("cli.flag.title", nil))
+	cmd.Flags().StringVar(&opts.DB, "db", "", loc.T("cli.flag.db", nil))
+	cmd.Flags().StringVar(&opts.Query, "query", "", loc.T("cli.flag.query", nil))
+	cmd.Flags().StringVar(&opts.QueryFile, "query-file", "", loc.T("cli.flag.query_file", nil))
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Second, loc.T("cli.flag.timeout", nil))
 	cmd.Flags().BoolP("help", "h", false, loc.T("cli.flag.help", nil))
 	cmd.Flags().Bool("version", false, loc.T("cli.flag.version", nil))
 

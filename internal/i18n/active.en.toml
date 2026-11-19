@@ -19,7 +19,8 @@ other = "Input"
 ["cli.help.input"]
 description = "Input modes supported by the CLI."
 other = """  stdin is read when it is not a TTY and no file is given.
-  Use '-' to read stdin explicitly; pass one or more matching files to concatenate them."""
+  Use '-' to read stdin explicitly; pass one or more matching files to concatenate them.
+  Use --db with --query/--query-file for a read-only SQLite query."""
 
 ["cli.help.types_label"]
 description = "Label before supported chart types."
@@ -44,6 +45,7 @@ description = "Example invocations."
 other = """  printf 'day,signups\\nMon,3\\nTue,5\\n' | pl
   pl sales.csv
   pl sales.csv --columns revenue --sort revenue:desc --filter 'revenue>=1000'
+  pl --db metrics.db --query 'select day, signups from metrics'
   pl sales.csv --type bar --title 'Revenue'"""
 
 ["cli.help.exit_label"]
@@ -77,6 +79,22 @@ other = "sort rows: column[:asc|desc]; repeated or comma-separated"
 ["cli.flag.filter"]
 description = "Flag description for --filter."
 other = "filter rows: column<op>value; repeatable (AND)"
+
+["cli.flag.db"]
+description = "Flag description for --db."
+other = "read a SQLite database file (read-only)"
+
+["cli.flag.query"]
+description = "Flag description for --query."
+other = "SQL query to run against --db"
+
+["cli.flag.query_file"]
+description = "Flag description for --query-file."
+other = "read the SQL query from a file"
+
+["cli.flag.timeout"]
+description = "Flag description for --timeout."
+other = "database query timeout (Go duration)"
 
 ["cli.flag.delimiter"]
 description = "Flag description for --delimiter."
@@ -189,6 +207,30 @@ other = "no plottable values"
 ["cli.error.internal"]
 description = "An unexpected internal failure."
 other = "internal error: {{.Detail}}"
+
+["cli.error.source_conflict"]
+description = "Database and positional file sources were combined."
+other = "use either a database source or file arguments, not both"
+
+["cli.error.db_missing"]
+description = "A query was supplied without a database path."
+other = "no database configured; use --db or PL_DB"
+
+["cli.error.query_missing"]
+description = "A database path was supplied without a query."
+other = "no query; use --query or --query-file"
+
+["cli.error.invalid_timeout"]
+description = "The database timeout is not positive."
+other = "--timeout must be positive"
+
+["cli.error.query_conflict"]
+description = "Both query flags were supplied."
+other = "use only one of --query and --query-file"
+
+["cli.error.db_timeout"]
+description = "A database query exceeded its timeout."
+other = "database query timed out after {{.Timeout}}"
 
 ["cli.error.stdin_with_files"]
 description = "stdin was combined with multiple file arguments."

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,12 @@ func run(args []string, stream appIO) int {
 		var appErr *appError
 		if errors.As(err, &appErr) {
 			if appErr.code == exitBrokenPipe {
+				return appErr.code
+			}
+			if appErr.id == "" {
+				if appErr.cause != nil {
+					fmt.Fprintln(stream.Err, domain.SanitizeText(appErr.cause.Error()))
+				}
 				return appErr.code
 			}
 			printAppError(stream.Err, loc, appErr)
@@ -66,7 +73,7 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 		return headerErr
 	}
 
-	ds, sourcePath, fromStdin, err := loadDataset(args, stream, delimiter, headerMode)
+	ds, sourcePath, fromStdin, err := loadDataset(args, opts, stream, delimiter, headerMode)
 	if err != nil {
 		return asAppError(err, sourcePath, fromStdin)
 	}
@@ -127,7 +134,48 @@ func runApp(args []string, opts *cliOptions, stream appIO, loc *i18n.Localizer) 
 	return nil
 }
 
-func loadDataset(args []string, stream appIO, delimiter rune, header storage.HeaderMode) (*domain.Dataset, string, bool, error) {
+func loadDataset(args []string, opts *cliOptions, stream appIO, delimiter rune, header storage.HeaderMode) (*domain.Dataset, string, bool, error) {
+	dbPath := strings.TrimSpace(opts.DB)
+	if dbPath == "" && len(args) == 0 {
+		dbPath = strings.TrimSpace(stream.Env["PL_DB"])
+	}
+	query := strings.TrimSpace(opts.Query)
+	queryFile := strings.TrimSpace(opts.QueryFile)
+	if query == "" && queryFile == "" && len(args) == 0 {
+		query = strings.TrimSpace(stream.Env["PL_QUERY"])
+	}
+	explicitDB := strings.TrimSpace(opts.DB) != "" ||
+		strings.TrimSpace(opts.Query) != "" ||
+		strings.TrimSpace(opts.QueryFile) != ""
+	hasDBSource := dbPath != "" || query != "" || queryFile != ""
+	if hasDBSource && len(args) > 0 {
+		if explicitDB {
+			return nil, "", false, usageError("cli.error.source_conflict", nil)
+		}
+		hasDBSource = false
+	}
+	if hasDBSource {
+		if dbPath == "" {
+			return nil, "", false, usageError("cli.error.db_missing", nil)
+		}
+		if query != "" && queryFile != "" {
+			return nil, "", false, usageError("cli.error.query_conflict", nil)
+		}
+		if query == "" && queryFile == "" {
+			return nil, "", false, usageError("cli.error.query_missing", nil)
+		}
+		if opts.Timeout <= 0 {
+			return nil, "", false, usageError("cli.error.invalid_timeout", nil)
+		}
+		ds, err := storage.ReadSQLite(context.Background(), storage.SQLiteOptions{
+			Path:      dbPath,
+			Query:     query,
+			QueryFile: queryFile,
+			Timeout:   opts.Timeout,
+		})
+		return ds, dbPath, false, err
+	}
+
 	options := storage.CSVOptions{
 		Delimiter:  delimiter,
 		HeaderMode: header,
