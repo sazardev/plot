@@ -61,6 +61,18 @@ Use `--type bar|line|pie|donut` to choose explicitly.
 - Strict TOML configuration with flags > environment > config > default precedence.
 - A browser playground for CSV, TSV, Markdown tables, JSON, SQL dumps, Excel and SQLite, with PNG/JPG/WebP/PDF export, saved history and a local data agent.
 
+## Try the example workspace
+
+The repository includes a self-contained playground with CSV, SQLite, config, delimiter, edge-case and browser-format fixtures:
+
+```sh
+./examples/run.sh          # interactive menu
+./examples/run.sh sqlite   # or run one scenario directly
+./examples/run.sh tui
+```
+
+See [examples/README.md](examples/README.md) for every scenario and file.
+
 ## Documentation
 
 The full usage guide, flag reference, config example, TUI keys and exit codes live on the website:

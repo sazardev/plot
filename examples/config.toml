@@ -1,0 +1,11 @@
+[database]
+path = "metrics.db"
+query = "select day, signups, revenue from metrics order by day"
+timeout = "5s"
+
+[display]
+color = "auto"
+ascii = false
+
+[cache]
+enabled = true

@@ -1,0 +1,8 @@
+[
+  {"week": "W01", "product": 320, "enterprise": 88},
+  {"week": "W02", "product": 348, "enterprise": 94},
+  {"week": "W03", "product": 331, "enterprise": 102},
+  {"week": "W04", "product": 390, "enterprise": 111},
+  {"week": "W05", "product": 412, "enterprise": 118},
+  {"week": "W06", "product": 438, "enterprise": 126}
+]

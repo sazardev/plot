@@ -1,0 +1,13 @@
+region,month,revenue,cost,channel
+EU,Jan,42000,21000,Paid
+US,Jan,61200,32000,Organic
+APAC,Jan,28000,16000,Referral
+EU,Feb,48500,23800,Paid
+US,Feb,67400,34100,Organic
+APAC,Feb,31200,17800,Referral
+EU,Mar,53200,25600,Paid
+US,Mar,72100,36800,Organic
+APAC,Mar,34800,19500,Referral
+EU,Apr,50100,24900,Paid
+US,Apr,69800,35200,Organic
+APAC,Apr,33600,18900,Referral

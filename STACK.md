@@ -53,6 +53,7 @@ sqlc.yaml                         sqlite engine, schema, queries, output package
 testdata/                         sample inputs; render/TUI goldens live in internal/*/testdata
 docs/                             static product site and assets, served by GitHub Pages
 docs/assets/vendor/               browser-only Chart.js, SheetJS, sql.js, jsPDF and licenses
+examples/                         runnable scenario workspace and browser upload fixtures
 ```
 
 Dependency direction: `cmd → ui → render → domain` and `cmd → storage → domain`; `cmd → config` and
@@ -126,6 +127,7 @@ Dependency direction: `cmd → ui → render → domain` and `cmd → storage �
 | Coverage | `go test -coverprofile=coverage.out ./... && go tool cover -func=coverage.out` |
 | Install hooks | `lefthook install` |
 | Serve the site | `python3 -m http.server -d docs 8765` |
+| Run examples | `./examples/run.sh` or `./examples/run.sh bar` |
 
 ## Testing
 
