@@ -630,10 +630,12 @@ PL_DB=metrics.db PL_QUERY='select * from weekly' pl</code></pre>
               <pre tabindex="0"><code>pl --tui sales.csv
 pl --tui --no-motion sales.csv   <span class="comment"># static first frame</span></code></pre>
             </div>
-            <div class="callout" style="margin-top: 1rem;">
+            <p class="callout">
               <code>tab</code> cycles only chart types compatible with the data. Multi-series files usually fit
-              line only; a single-series file can use line, bar, pie and donut.
-            </div>
+              line only; a single-series file can use line, bar, pie and donut. Press <code>e</code> to see the
+              current chart, destination directory and filename pattern; <code>p</code>, <code>j</code> and
+              <code>d</code> export PNG, JPG and PDF, and the status bar shows the saved path.
+            </p>
             <div class="key-grid">
               <div class="key-item"><kbd>q</kbd><span>Quit</span></div>
               <div class="key-item"><kbd>tab</kbd><span>Next chart type</span></div>

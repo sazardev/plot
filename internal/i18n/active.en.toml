@@ -397,9 +397,25 @@ other = "could not load data"
 description = "TUI export panel title."
 other = "Export current chart"
 
+["tui.export.current"]
+description = "TUI export panel: chart type being exported."
+other = "Current chart: {{.Type}}"
+
+["tui.export.destination"]
+description = "TUI export panel: directory where files are written."
+other = "Files go to: {{.Dir}}"
+
+["tui.export.naming"]
+description = "TUI export panel: generated file name pattern."
+other = "Name: pl-<type>-<date-time>.<ext>"
+
 ["tui.export.hint"]
 description = "TUI export panel choices."
-other = "p  PNG\nj  JPG\nd  PDF\nesc  cancel"
+other = "p  PNG image\nj  JPG image\nd  PDF document\nesc  cancel"
+
+["tui.export.note"]
+description = "TUI export panel note about preserving the rendered chart."
+other = "The exported file keeps the current colors, braille and block glyphs. The status bar shows the saved path."
 
 ["tui.export.done"]
 description = "TUI status after a successful chart export."
@@ -412,6 +428,14 @@ other = "export failed: {{.Detail}}"
 ["tui.export.unavailable"]
 description = "TUI export requested without an exporter."
 other = "export is unavailable"
+
+["tui.help.tab"]
+description = "Full TUI help: chart compatibility note."
+other = "Tab cycles only chart types compatible with the current data."
+
+["tui.help.export"]
+description = "Full TUI help: export key and destination."
+other = "e opens export: p PNG, j JPG, d PDF. Files are written to {{.Dir}} after a chart loads."
 
 ["tui.only_compatible"]
 description = "TUI notice when only one chart type fits the data."
@@ -448,6 +472,18 @@ other = "1 warning"
 ["tui.warnings"]
 description = "Warning count in the TUI status line."
 other = "{{.CountText}} warnings"
+
+["tui.status_ready_export"]
+description = "TUI ready status including the export shortcut."
+other = "ready · e export"
+
+["tui.warning_one_export"]
+description = "TUI status with one warning and the export shortcut."
+other = "1 warning · e export"
+
+["tui.warnings_export"]
+description = "TUI status with several warnings and the export shortcut."
+other = "{{.CountText}} warnings · e export"
 
 ["tui.status_ready"]
 description = "Status line when the chart is ready."

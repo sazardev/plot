@@ -21,8 +21,9 @@ pl example workspace
  10  edge        Nulls, negatives, duplicates and ragged rows
  11  errors      Expected failures and exit codes
  12  cache       Cold/warm cache demonstration
- 13  web         Files for the browser playground
- 14  all         Run the main chart scenarios
+ 13  export      Native PNG, JPG and PDF export
+ 14  web         Files for the browser playground
+ 15  all         Run the main chart scenarios
   q  quit
 
 Usage: ./examples/run.sh <number|name>

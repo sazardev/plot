@@ -44,6 +44,9 @@ type Options struct {
 	// Export writes the current chart in format (png, jpg or pdf) and returns
 	// the path. It runs inside a tea.Cmd.
 	Export func(*domain.RenderSpec, string) (string, error)
+	// ExportDir is shown in the export panel and help; it is the directory
+	// where the application callback writes files.
+	ExportDir string
 }
 
 // Model is the single-screen plot view.
@@ -84,6 +87,10 @@ type Model struct {
 func New(opts Options) Model {
 	opts.Title = domain.SanitizeText(opts.Title)
 	opts.SourceName = domain.SanitizeText(opts.SourceName)
+	opts.ExportDir = domain.SanitizeText(opts.ExportDir)
+	if opts.ExportDir == "" {
+		opts.ExportDir = "."
+	}
 	loc := opts.Locale
 	if loc == nil {
 		loc, _ = i18n.New("en")
@@ -404,12 +411,12 @@ func (m Model) status() string {
 	}
 	warnings := len(view.warnings)
 	if warnings == 0 {
-		return loc.T("tui.status_ready", nil)
+		return loc.T("tui.status_ready_export", nil)
 	}
 	if warnings == 1 {
-		return loc.T("tui.warning_one", nil)
+		return loc.T("tui.warning_one_export", nil)
 	}
-	return loc.T("tui.warnings", map[string]any{
+	return loc.T("tui.warnings_export", map[string]any{
 		"Count":     warnings,
 		"CountText": loc.FormatInt(warnings),
 	})
@@ -422,11 +429,26 @@ func (m Model) body(width, height int) string {
 		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, text), width, height)
 	}
 	if m.exporting {
-		text := loc.T("tui.export.title", nil) + "\n\n" + loc.T("tui.export.hint", nil)
-		if m.exportErr != nil {
-			text += "\n\n" + loc.T("tui.export.failed", map[string]any{"Detail": domain.SanitizeText(m.exportErr.Error())})
+		chartType := ""
+		if m.current >= 0 && m.current < len(m.order) {
+			chartType = string(m.order[m.current])
 		}
-		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, text), width, height)
+		lines := []string{
+			loc.T("tui.export.title", nil),
+			"",
+			loc.T("tui.export.current", map[string]any{"Type": chartType}),
+			loc.T("tui.export.destination", map[string]any{"Dir": m.opts.ExportDir}),
+			loc.T("tui.export.naming", nil),
+			"",
+			loc.T("tui.export.hint", nil),
+			"",
+			loc.T("tui.export.note", nil),
+		}
+		if m.exportErr != nil {
+			lines = append(lines, "", loc.T("tui.export.failed", map[string]any{"Detail": domain.SanitizeText(m.exportErr.Error())}))
+		}
+		text := strings.Join(lines, "\n")
+		return padBlock(lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, wrapLines(text, width-4)), width, height)
 	}
 	if m.err != nil {
 		icon := "✗"
@@ -481,6 +503,16 @@ func (m Model) helpText() string {
 	if warnings := m.warningText(); warnings != "" {
 		text += "\n\n" + warnings
 	}
+	width := m.width
+	if width <= 0 {
+		width = 80
+	}
+	width -= 4
+	if width < 20 {
+		width = 20
+	}
+	text += "\n\n" + wrapText(m.opts.Locale.T("tui.help.tab", nil), width)
+	text += "\n" + wrapText(m.opts.Locale.T("tui.help.export", map[string]any{"Dir": m.opts.ExportDir}), width)
 	return text
 }
 
@@ -610,6 +642,14 @@ func padBlock(text string, width, height int) string {
 	blank := strings.Repeat(" ", width)
 	for len(lines) < height {
 		lines = append(lines, blank)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func wrapLines(text string, width int) string {
+	lines := strings.Split(text, "\n")
+	for index, line := range lines {
+		lines[index] = wrapText(line, width)
 	}
 	return strings.Join(lines, "\n")
 }

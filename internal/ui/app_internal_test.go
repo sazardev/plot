@@ -243,3 +243,14 @@ func TestTUITabExplainsSingleCompatibleChart(t *testing.T) {
 	model = updated.(Model)
 	require.Contains(t, model.status(), "only bar fits")
 }
+
+func TestTUIHelpShowsExportDestinationAtMinimumWidth(t *testing.T) {
+	t.Parallel()
+
+	model := internalModel(t, 40, 20)
+	model.showHelp = true
+	model.help.ShowAll = true
+	view := model.View()
+	require.Contains(t, view, "e opens export")
+	require.Contains(t, view, "Files are written to")
+}

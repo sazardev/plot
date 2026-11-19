@@ -136,6 +136,7 @@ CGO_ENABLED=0 go build -o pl ./cmd/pl
 ./pl examples/revenue.csv --type bar --export chart.pdf
 
 # in the TUI: press e, then p (PNG), j (JPG) or d (PDF)
+# the panel shows the current chart, destination directory and filename pattern
 ```
 
 From the repository root, `pl --help` is the complete flag reference. The website guide is at

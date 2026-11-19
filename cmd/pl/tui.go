@@ -78,17 +78,17 @@ func runTUI(
 		options.Height = height
 		return domain.BuildRenderSpec(ds, options)
 	}
+	exportDir, err := os.Getwd()
+	if err != nil {
+		exportDir = "."
+	}
 	exportChart := func(spec *domain.RenderSpec, format string) (string, error) {
 		frame, err := render.Chart(spec, theme)
 		if err != nil {
 			return "", err
 		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
 		filename := fmt.Sprintf("pl-%s-%s.%s", spec.ChartType, time.Now().Format("20060102-150405"), format)
-		path := filepath.Join(cwd, filename)
+		path := filepath.Join(exportDir, filename)
 		if err := export.WriteFrame(frame, path); err != nil {
 			return "", err
 		}
@@ -107,6 +107,7 @@ func runTUI(
 		Color:       colorEnabled,
 		OnLoaded:    afterLoad,
 		Export:      exportChart,
+		ExportDir:   exportDir,
 	})
 
 	program := tea.NewProgram(
